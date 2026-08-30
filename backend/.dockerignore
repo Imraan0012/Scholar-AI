@@ -1,0 +1,19 @@
+# =============================================================================
+# SCHOLAR AI BACKEND — DOCKER IGNORE
+# =============================================================================
+
+target/
+*.jar
+*.war
+.git/
+.gitignore
+.dockerignore
+.env
+.env.*
+*.log
+.idea/
+.vscode/
+*.iml
+.mvn/
+mvnw
+mvnw.cmd
