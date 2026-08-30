@@ -1,6 +1,8 @@
 package com.scholarai.backend.controller;
 
 import com.scholarai.backend.dto.ApiResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -15,13 +17,14 @@ import java.util.UUID;
 
 /**
  * Public auth utility endpoints — no JWT required.
- * Handles seamless account registration and password synchronization directly in Supabase auth tables
- * bypassing Supabase client-side email rate limits completely.
+ * Handles seamless account registration and password synchronization directly in Supabase auth tables.
+ * Compatible with /register, /signup, and /v1/signup requests.
  */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
     private final JdbcTemplate jdbcTemplate;
     private final BCryptPasswordEncoder passwordEncoder;
 
@@ -34,19 +37,33 @@ public class AuthController {
      * Creates or updates a user in auth.users and auth.identities with email pre-confirmed.
      * Guarantees 100% immediate compatibility with Supabase signInWithPassword.
      */
-    @PostMapping("/register")
+    @PostMapping({"/register", "/signup", "/v1/signup"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> register(
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, Object> body) {
 
-        String email = body == null ? null : body.get("email");
-        String password = body == null ? null : body.get("password");
-        String fullName = body == null ? null : body.get("fullName");
+        String email = body == null ? null : (String) body.get("email");
+        String password = body == null ? null : (String) body.get("password");
+        
+        String fullName = null;
+        if (body != null) {
+            if (body.get("fullName") != null) {
+                fullName = body.get("fullName").toString();
+            } else if (body.get("full_name") != null) {
+                fullName = body.get("full_name").toString();
+            } else if (body.get("data") instanceof Map<?, ?> dataMap) {
+                if (dataMap.get("full_name") != null) {
+                    fullName = dataMap.get("full_name").toString();
+                } else if (dataMap.get("fullName") != null) {
+                    fullName = dataMap.get("fullName").toString();
+                }
+            }
+        }
 
         if (email == null || email.isBlank()) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Email is required"));
         }
-        if (password == null || password.length() < 8) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("Password must be at least 8 characters"));
+        if (password == null || password.length() < 6) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Password must be at least 6 characters"));
         }
 
         String normalizedEmail = email.trim().toLowerCase();
@@ -93,12 +110,18 @@ public class AuthController {
                             userIdStr, userIdStr, userMetaData
                     );
                 } catch (Exception ie) {
-                    System.out.println("[AuthController] Identity sync notice: " + ie.getMessage());
+                    log.debug("[AuthController] Identity sync notice: {}", ie.getMessage());
                 }
 
                 return ResponseEntity.ok(ApiResponse.success(
                         "Account ready",
-                        Map.of("created", false, "exists", true, "email", normalizedEmail, "userId", userIdStr)
+                        Map.of(
+                                "created", false,
+                                "exists", true,
+                                "email", normalizedEmail,
+                                "userId", userIdStr,
+                                "user", Map.of("id", userIdStr, "email", normalizedEmail)
+                        )
                 ));
             }
 
@@ -144,13 +167,20 @@ public class AuthController {
                     userMetaData
             );
 
+            log.info("[AuthController] Account created successfully for {}", normalizedEmail);
+
             return ResponseEntity.ok(ApiResponse.success(
                     "Account created successfully",
-                    Map.of("created", true, "userId", userIdStr, "email", normalizedEmail)
+                    Map.of(
+                            "created", true,
+                            "userId", userIdStr,
+                            "email", normalizedEmail,
+                            "user", Map.of("id", userIdStr, "email", normalizedEmail)
+                    )
             ));
 
         } catch (Exception e) {
-            System.err.println("[AuthController] register error: " + e.getMessage());
+            log.error("[AuthController] Registration exception: ", e);
             return ResponseEntity.status(500).body(ApiResponse.error("Registration failed: " + e.getMessage()));
         }
     }
@@ -182,7 +212,7 @@ public class AuthController {
                 return ResponseEntity.ok(ApiResponse.success("Already confirmed or not found", Map.of("confirmed", false)));
             }
         } catch (Exception e) {
-            System.err.println("[AuthController] confirm-user error: " + e.getMessage());
+            log.error("[AuthController] confirm-user error: ", e);
             return ResponseEntity.ok(ApiResponse.success("Could not confirm", Map.of("confirmed", false)));
         }
     }
