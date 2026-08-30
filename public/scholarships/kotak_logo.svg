@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <circle cx="50" cy="50" r="46" fill="#FFF5F5" stroke="#E11D48" stroke-width="2"/>
+  <path d="M 32 32 C 45 25 55 35 48 50 C 55 65 45 75 32 68 C 40 55 40 45 32 32 Z" fill="#E11D48"/>
+  <path d="M 68 32 C 55 25 45 35 52 50 C 45 65 55 75 68 68 C 60 55 60 45 68 32 Z" fill="#00529B"/>
+  <circle cx="50" cy="50" r="4" fill="#FFFFFF"/>
+  <text x="50" y="86" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="900" fill="#E11D48" text-anchor="middle" letter-spacing="1">KOTAK</text>
+</svg>

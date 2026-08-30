@@ -1,0 +1,72 @@
+# =============================================================================
+# SCHOLAR AI — GIT IGNORE CONFIGURATION
+# =============================================================================
+
+# --- Environment & Sensitive Credentials ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+*.env
+*.pem
+*.key
+*.cert
+*.p12
+
+# --- Node & Frontend Dependencies ---
+node_modules/
+/dist
+/build
+.npm
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Java Spring Boot / Maven ---
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+.m2/
+apache-maven.zip
+apache-maven-*/
+
+# --- Python ML Engine ---
+ml/__pycache__/
+ml/*.pyc
+ml/venv/
+ml/.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# --- Temporary & Scratch Artifacts ---
+_rules_dump.txt
+*.log
+*.tmp
+*.bak
+_test_*.cjs
+_audit_*.cjs
+_check_*.cjs
+_execute_*.cjs
+_predeploy_*.cjs
+
+# --- IDE & OS Files ---
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

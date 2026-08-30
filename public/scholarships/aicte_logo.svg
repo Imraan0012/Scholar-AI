@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <circle cx="50" cy="50" r="46" fill="#FFFBEB" stroke="#D97706" stroke-width="2"/>
+  <circle cx="50" cy="45" r="20" fill="none" stroke="#D97706" stroke-width="3" stroke-dasharray="6,3"/>
+  <circle cx="50" cy="45" r="8" fill="#D97706"/>
+  <path d="M 50 20 L 50 70 M 25 45 L 75 45" stroke="#D97706" stroke-width="2"/>
+  <text x="50" y="86" font-family="system-ui, -apple-system, sans-serif" font-size="8" font-weight="900" fill="#D97706" text-anchor="middle" letter-spacing="1">AICTE</text>
+</svg>
