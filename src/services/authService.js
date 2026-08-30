@@ -159,7 +159,10 @@ export const authService = {
       return { success: false, message: 'Full name is required.' };
     }
 
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+    let API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').trim().replace(/\/+$/, '');
+    if (!API_BASE.endsWith('/api')) {
+      API_BASE = `${API_BASE}/api`;
+    }
 
     try {
       // STEP 1: Register via backend (no email sending, no rate limits)
@@ -172,7 +175,7 @@ export const authService = {
         });
         registerRes = await response.json();
       } catch (fetchErr) {
-        console.warn('[AuthService] Backend register failed, falling back to Supabase signUp:', fetchErr.message);
+        console.warn('[AuthService] Backend register failed:', fetchErr.message, 'Endpoint:', `${API_BASE}/auth/register`);
         // Fallback to Supabase if backend is unreachable
         return await this._supabaseSignUp(normalizedEmail, password, trimmedName);
       }

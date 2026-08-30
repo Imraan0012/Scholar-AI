@@ -1,11 +1,18 @@
 // =============================================================================
 // SCHOLAR AI — CENTRAL API CLIENT FOR SPRING BOOT REST BACKEND
-// Communicates with http://localhost:8000/api with Supabase JWT Bearer Tokens.
+// Communicates with Spring Boot API using Supabase JWT Bearer Tokens.
 // =============================================================================
 
 import { supabase } from '../lib/supabaseClient';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+export function getNormalizedApiBase() {
+  let base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').trim();
+  base = base.replace(/\/+$/, ''); // Remove trailing slashes
+  if (!base.endsWith('/api')) {
+    base = `${base}/api`;
+  }
+  return base;
+}
 
 async function getAuthHeaders() {
   const headers = {
@@ -28,7 +35,8 @@ async function getAuthHeaders() {
 export const apiClient = {
   async get(endpoint, params = {}) {
     const headers = await getAuthHeaders();
-    const url = new URL(`${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`);
+    const apiBase = getNormalizedApiBase();
+    const url = new URL(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`);
 
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -46,7 +54,8 @@ export const apiClient = {
 
   async post(endpoint, body = {}) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
+    const apiBase = getNormalizedApiBase();
+    const response = await fetch(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body)
@@ -57,7 +66,8 @@ export const apiClient = {
 
   async put(endpoint, body = {}) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
+    const apiBase = getNormalizedApiBase();
+    const response = await fetch(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(body)
@@ -68,7 +78,8 @@ export const apiClient = {
 
   async delete(endpoint) {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
+    const apiBase = getNormalizedApiBase();
+    const response = await fetch(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
       method: 'DELETE',
       headers
     });
