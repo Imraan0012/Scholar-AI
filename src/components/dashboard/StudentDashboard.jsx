@@ -573,39 +573,39 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
       <div ref={scrollContainerRef} className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-[#F8F9FB]">
         
         {/* Top Header Row with Welcome & Search */}
-        <header className="px-5 sm:px-8 lg:px-10 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/70 bg-white/70">
+        <header className="px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200/70 bg-white/70">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
               <span>Welcome back, {studentName}!</span>
               <span>👋</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 font-medium">
+            <p className="text-[11.5px] sm:text-xs text-slate-500 mt-0.5 font-medium">
               Find and apply for scholarships that match your profile.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex items-center gap-2.5 self-end md:self-auto">
             {/* Top Search Input */}
-            <div className="relative w-64 sm:w-72 lg:w-80">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="relative w-56 sm:w-64 lg:w-72">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search scholarships..."
-                className="w-full h-10 pl-10 pr-3.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-100 shadow-xs"
+                className="w-full h-9 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-blue-100 shadow-xs"
               />
             </div>
 
             {/* Notification Bell */}
             <button
               onClick={() => setActiveNav('NOTIFICATIONS')}
-              className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-xs cursor-pointer hover:bg-slate-50 transition-colors relative"
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 shadow-xs cursor-pointer hover:bg-slate-50 transition-colors relative"
               title={unreadNotificationCount > 0 ? `${unreadNotificationCount} unread notifications` : 'Notifications'}
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-3.5 h-3.5" />
               {unreadNotificationCount > 0 && (
-                <span className="w-2 h-2 bg-[#2563EB] rounded-full absolute top-2.5 right-2.5" />
+                <span className="w-2 h-2 bg-[#2563EB] rounded-full absolute top-2 right-2" />
               )}
             </button>
 
@@ -613,7 +613,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-black text-xs shadow-xs flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent focus:ring-blue-300"
+                className="w-9 h-9 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity ring-2 ring-transparent focus:ring-blue-300"
                 title="User Menu"
               >
                 {initials}
@@ -650,7 +650,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <Settings className="w-4 h-4 text-slate-500" />
-                      <span>Settings & Preferences</span>
+                      <span>Account Settings</span>
                     </button>
 
                     {onGoToHome && (
@@ -687,25 +687,25 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
         </header>
 
         {/* Main Content Body */}
-        <main className="px-5 sm:px-8 lg:px-10 py-6 space-y-6 max-w-[1400px] w-full">
+        <main className="px-4 sm:px-6 lg:px-8 py-5 space-y-5 max-w-[1340px] w-full">
 
           {/* ======================================================================= */}
           {/* VIEW 1 & 2: SCHOLARSHIP INTELLIGENCE RESULTS & DISCOVERY                 */}
           {/* ======================================================================= */}
           {(activeNav === 'DASHBOARD' || activeNav === 'DISCOVERY') && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               
               {/* 1. ELIGIBILITY SUMMARY: 4 LARGE COMPACT SUMMARY CARDS */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
                 {/* Card 1: ELIGIBLE */}
                 <div
                   onClick={() => setSelectedFilterTab('ELIGIBLE')}
-                  className={`p-4 rounded-xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-2.5 ${
+                  className={`p-3.5 rounded-xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-2 ${
                     selectedFilterTab === 'ELIGIBLE' ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-emerald-300'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
                       ELIGIBLE
                     </span>
                     <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
@@ -725,23 +725,23 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                 {/* Card 2: POSSIBLE MATCH */}
                 <div
                   onClick={() => setSelectedFilterTab('POSSIBLE')}
-                  className={`p-4 rounded-xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-2.5 ${
+                  className={`p-3.5 rounded-xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-2 ${
                     selectedFilterTab === 'POSSIBLE' ? 'border-amber-500 ring-2 ring-amber-100' : 'border-slate-200 hover:border-amber-300'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
                       POSSIBLE MATCH
                     </span>
-                    <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                    <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
                       <AlertCircle className="w-3.5 h-3.5 stroke-[2.5]" />
                     </div>
                   </div>
                   <div>
-                    <span className="text-3xl sm:text-4xl font-black text-slate-900 block leading-none">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
                       {stats.possible}
                     </span>
-                    <span className="text-xs text-slate-500 block mt-2 font-medium">
+                    <span className="text-[11px] text-slate-500 block mt-1.5 font-medium">
                       Scholarships needing verification
                     </span>
                   </div>

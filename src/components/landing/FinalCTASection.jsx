@@ -11,9 +11,9 @@ export default function FinalCTASection({ onCheckEligibilityClick }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="py-24 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto relative z-10 text-center"
+      className="py-14 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto relative z-10 text-center"
     >
-      <div className="relative rounded-3xl p-10 sm:p-16 overflow-hidden border border-white/15 bg-gradient-to-b from-[#111424] to-[#0a0b12] shadow-2xl backdrop-blur-xl">
+      <div className="relative rounded-2xl p-8 sm:p-12 overflow-hidden border border-white/15 bg-gradient-to-b from-[#111424] to-[#0a0b12] shadow-2xl backdrop-blur-xl">
         {/* Animated Glow orb inside CTA card */}
         <motion.div
           animate={{
@@ -25,33 +25,33 @@ export default function FinalCTASection({ onCheckEligibilityClick }) {
             repeat: Infinity,
             ease: 'easeInOut'
           }}
-          className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-indigo-600/20 blur-[110px] pointer-events-none"
+          className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-indigo-600/20 blur-[90px] pointer-events-none"
         />
 
-        <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20 inline-block mb-4">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 inline-block mb-3">
           100% Free For All Indian Students
         </span>
 
-        <h2 className="text-4xl sm:text-6xl font-black text-white tracking-tight max-w-3xl mx-auto leading-tight">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight max-w-2xl mx-auto leading-tight">
           Stop Searching. <br className="hidden sm:inline" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-cyan-200 to-emerald-300">
             Start Matching.
           </span>
         </h2>
 
-        <p className="text-gray-200 mt-5 text-base sm:text-xl max-w-xl mx-auto font-medium leading-relaxed drop-shadow-md">
+        <p className="text-gray-300 mt-3.5 text-xs sm:text-sm max-w-lg mx-auto font-normal leading-relaxed drop-shadow-md">
           Let Scholar AI find the scholarships you're actually eligible for across Central, State, and Corporate funds.
         </p>
 
-        <div className="mt-10 flex justify-center">
+        <div className="mt-7 flex justify-center">
           <MagneticButton strength={0.25} onClick={onCheckEligibilityClick}>
             <HoverBorderGradient
               containerClassName="rounded-full shadow-2xl shadow-indigo-500/30"
-              className="bg-[#0b0d16] text-white font-bold text-lg px-10 py-4 flex items-center gap-3 group cursor-pointer"
+              className="bg-[#0b0d16] text-white font-bold text-xs sm:text-sm px-7 py-3 flex items-center gap-2.5 group cursor-pointer"
             >
-              <Sparkles className="w-5 h-5 text-cyan-400 group-hover:rotate-12 transition-transform duration-300" />
+              <Sparkles className="w-4 h-4 text-cyan-400 group-hover:rotate-12 transition-transform duration-300" />
               <span>Check My Eligibility</span>
-              <ArrowRight className="w-5 h-5 text-indigo-300 group-hover:translate-x-1.5 transition-transform duration-300" />
+              <ArrowRight className="w-4 h-4 text-indigo-300 group-hover:translate-x-1.5 transition-transform duration-300" />
             </HoverBorderGradient>
           </MagneticButton>
         </div>

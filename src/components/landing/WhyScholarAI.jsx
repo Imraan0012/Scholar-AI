@@ -34,17 +34,17 @@ export default function WhyScholarAI() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="py-24 px-4 max-w-6xl mx-auto relative z-10"
+      className="py-14 sm:py-16 px-4 max-w-5xl mx-auto relative z-10"
     >
-      <div className="glass-panel rounded-3xl p-8 sm:p-12 lg:p-16 border border-white/10 relative overflow-hidden bg-gradient-to-b from-[#10131f]/90 to-[#0c0d14]/95 shadow-2xl backdrop-blur-2xl">
-        <div className="max-w-3xl mb-12">
-          <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">
+      <div className="glass-panel rounded-2xl p-6 sm:p-9 lg:p-10 border border-white/10 relative overflow-hidden bg-gradient-to-b from-[#10131f]/90 to-[#0c0d14]/95 shadow-2xl backdrop-blur-2xl">
+        <div className="max-w-2xl mb-8">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
             Why Scholar AI
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mt-4">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mt-3">
             Designed to End Scholarship Confusion
           </h2>
-          <p className="text-gray-300 mt-4 text-base sm:text-lg">
+          <p className="text-gray-300 mt-3 text-xs sm:text-sm leading-relaxed">
             Over ₹1,000 Crores in Indian scholarships go unclaimed each year simply because students don't know they qualify. Scholar AI bridges this exact gap.
           </p>
         </div>

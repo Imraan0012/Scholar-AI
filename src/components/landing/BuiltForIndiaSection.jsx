@@ -69,66 +69,66 @@ export default function BuiltForIndiaSection({ onCheckEligibilityClick }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto relative z-10"
+      className="py-14 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto relative z-10"
     >
-      <div className="text-center max-w-3xl mx-auto mb-16">
-        <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-full border border-emerald-500/20">
+      <div className="text-center max-w-2xl mx-auto mb-10">
+        <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
           Tailored for Indian Education
         </span>
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mt-4">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mt-3">
           Built Specifically for <br className="hidden sm:inline" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-cyan-200 to-indigo-300">
             Indian Student Eligibility
           </span>
         </h2>
-        <p className="text-gray-300 mt-4 text-base sm:text-lg">
+        <p className="text-gray-300 mt-3 text-xs sm:text-sm leading-relaxed">
           Scholarships in India depend on multi-criteria rules. Scholar AI evaluates all 4 critical dimensions simultaneously with our interactive 3D eligibility stack.
         </p>
       </div>
 
       {/* CardSwap 3D Interactive Stack Container */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-12 pt-6 pb-12">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-10 pt-4 pb-8">
         {/* Left Side: Descriptive Column */}
-        <div className="w-full lg:w-1/2 space-y-6 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="w-full lg:w-1/2 space-y-4 text-left">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-950/60 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+            <Sparkles className="w-3 h-3 text-cyan-400" />
             <span>Interactive 3D Dimension Stack</span>
           </div>
 
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-white leading-snug">
+          <h3 className="text-xl sm:text-2xl font-extrabold text-white leading-snug">
             4 Core Eligibility Vectors Evaluated in Seconds
           </h3>
 
-          <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">
             Instead of searching through endless government PDFs and missing application deadlines, Scholar AI takes your profile criteria and checks every eligibility condition across all 4 vectors in real time.
           </p>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-indigo-400/40 hover:bg-[#121528] transition-all">
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <div className="p-3 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-indigo-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-white block">✓ Academic Fit</span>
-              <span className="text-[11px] text-gray-400">Course, Year, CGPA & Boards</span>
+              <span className="text-[10.5px] text-gray-400">Course, Year, CGPA & Boards</span>
             </div>
-            <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-emerald-400/40 hover:bg-[#121528] transition-all">
+            <div className="p-3 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-emerald-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-emerald-400 block">✓ Income Verification</span>
-              <span className="text-[11px] text-gray-400">EWS & Slab Based Waivers</span>
+              <span className="text-[10.5px] text-gray-400">EWS & Slab Based Waivers</span>
             </div>
-            <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-violet-400/40 hover:bg-[#121528] transition-all">
+            <div className="p-3 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-violet-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-violet-400 block">✓ Social Category</span>
-              <span className="text-[11px] text-gray-400">Reserved, Minority & STEM Girls</span>
+              <span className="text-[10.5px] text-gray-400">Reserved, Minority & STEM Girls</span>
             </div>
-            <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-amber-400/40 hover:bg-[#121528] transition-all">
+            <div className="p-3 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-amber-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-amber-400 block">✓ 28 States Domicile</span>
-              <span className="text-[11px] text-gray-400">MahaDBT, SSP & State Portals</span>
+              <span className="text-[10.5px] text-gray-400">MahaDBT, SSP & State Portals</span>
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-2">
             <button
               onClick={onCheckEligibilityClick}
-              className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-bold text-sm shadow-xl shadow-indigo-500/25 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              className="px-6 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-bold text-xs sm:text-sm shadow-xl shadow-indigo-500/25 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
               <span>Check My Multi-Vector Fit</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

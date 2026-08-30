@@ -41,13 +41,13 @@ export default function HowItWorksSection({ onCheckEligibilityClick }) {
   ];
 
   return (
-    <section id="how-it-works" className="py-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto relative z-10">
-      <div className="text-center max-w-3xl mx-auto mb-16">
+    <section id="how-it-works" className="py-14 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto relative z-10">
+      <div className="text-center max-w-2xl mx-auto mb-10">
         <motion.span
           initial={{ opacity: 0, scale: 0.9 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          className="text-xs font-bold uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-3.5 py-1.5 rounded-full border border-indigo-500/20"
+          className="text-[11px] font-bold uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20"
         >
           How Scholar AI Works
         </motion.span>
@@ -56,7 +56,7 @@ export default function HowItWorksSection({ onCheckEligibilityClick }) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight mt-4"
+          className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mt-3"
         >
           From Search to Scholarship in <br className="hidden sm:inline" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-cyan-300">
@@ -68,7 +68,7 @@ export default function HowItWorksSection({ onCheckEligibilityClick }) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-gray-300 mt-4 text-base sm:text-lg"
+          className="text-gray-300 mt-3 text-xs sm:text-sm leading-relaxed"
         >
           No more getting lost in 50 different government portals or filling tedious forms for scholarships you aren't eligible to receive.
         </motion.p>

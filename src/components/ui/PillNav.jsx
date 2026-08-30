@@ -57,10 +57,10 @@ export default function PillNav({
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center pt-4 sm:pt-6 px-4 pointer-events-none">
+    <header className="fixed top-0 left-0 right-0 z-50 flex justify-center items-center pt-3 sm:pt-4 px-4 pointer-events-none">
       <nav
         className={cn(
-          "pointer-events-auto flex items-center justify-between gap-2 sm:gap-4 p-2 sm:p-2.5 rounded-full border border-white/10 shadow-2xl transition-all duration-300 max-w-5xl w-full mx-auto",
+          "pointer-events-auto flex items-center justify-between gap-2 sm:gap-3 p-1.5 sm:p-2 rounded-full border border-white/10 shadow-2xl transition-all duration-300 max-w-4xl w-full mx-auto",
           scrolled ? "bg-[#0b0d14]/90 border-white/15 shadow-black/60" : "bg-[#0f111a]/75 border-white/10",
           className
         )}
@@ -73,22 +73,22 @@ export default function PillNav({
             e.preventDefault();
             handleLinkClick('#hero');
           }}
-          className="flex items-center gap-2.5 pl-3 pr-2 py-1 text-white group"
+          className="flex items-center gap-2 pl-2.5 pr-2 py-0.5 text-white group"
         >
           {logo ? (
-            <img src={logo} alt={logoAlt} className="w-6 h-6 object-contain group-hover:rotate-12 transition-transform duration-300" />
+            <img src={logo} alt={logoAlt} className="w-5 h-5 object-contain group-hover:rotate-12 transition-transform duration-300" />
           ) : (
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
-              <Sparkles className="w-4 h-4" />
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/30">
+              <Sparkles className="w-3.5 h-3.5" />
             </div>
           )}
-          <span className="font-bold tracking-tight text-base sm:text-lg text-white group-hover:text-indigo-300 transition-colors">
+          <span className="font-bold tracking-tight text-sm sm:text-base text-white group-hover:text-indigo-300 transition-colors">
             {brandText}
           </span>
         </a>
 
         {/* Desktop Nav Items with Sliding Pill Indicator */}
-        <div className="hidden md:flex items-center relative rounded-full p-1 bg-black/30 border border-white/5">
+        <div className="hidden md:flex items-center relative rounded-full p-0.5 bg-black/30 border border-white/5">
           {items.map((item) => {
             const isCurrent = active === item.href;
             const isHovered = hovered === item.href;
@@ -104,7 +104,7 @@ export default function PillNav({
                 onMouseEnter={() => setHovered(item.href)}
                 onMouseLeave={() => setHovered(null)}
                 className={cn(
-                  "relative px-4 py-1.5 text-xs lg:text-sm font-medium rounded-full transition-colors duration-200 z-10 select-none",
+                  "relative px-3.5 py-1 text-xs font-medium rounded-full transition-colors duration-200 z-10 select-none",
                   isCurrent ? "text-black" : "text-gray-300 hover:text-white"
                 )}
               >

@@ -74,35 +74,35 @@ export default function ScholarshipTypes({ onCheckEligibilityClick }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="py-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto relative z-10"
+      className="py-14 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto relative z-10"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: Heading & Information */}
-        <div className="lg:col-span-6 space-y-6 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="lg:col-span-6 space-y-4 text-left">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs font-semibold">
+            <Sparkles className="w-3 h-3 text-cyan-400" />
             <span>Discovery Scope</span>
           </div>
 
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight">
             Scholarships <br className="hidden sm:inline" />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-indigo-300 to-emerald-300">
               Across India
             </span>
           </h2>
 
-          <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+          <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">
             From Central Ministry portals to premier private corporate trusts, discover funding opportunities mapped directly to your criteria in our 3D category deck.
           </p>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-indigo-400/40 hover:bg-[#121528] transition-all">
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <div className="p-3 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-indigo-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-indigo-300 block">Central & State DBT</span>
-              <span className="text-[11px] text-gray-400">Direct Account Transfer</span>
+              <span className="text-[10.5px] text-gray-400">Direct Account Transfer</span>
             </div>
-            <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-cyan-400/40 hover:bg-[#121528] transition-all">
+            <div className="p-3 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-cyan-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-cyan-300 block">AICTE & Tech Grants</span>
-              <span className="text-[11px] text-gray-400">Degree & Diploma Aid</span>
+              <span className="text-[10.5px] text-gray-400">Degree & Diploma Aid</span>
             </div>
             <div className="p-3.5 rounded-xl bg-[#0f1220]/80 border border-white/10 hover:border-purple-400/40 hover:bg-[#121528] transition-all">
               <span className="text-xs font-bold text-purple-300 block">UGC & Doctoral</span>

@@ -50,23 +50,23 @@ export default function LoginPage({ onSwitchToSignUp, onSwitchToForgotPassword, 
   };
 
   return (
-    <div className="w-full max-w-4xl bg-[#0c0d12] border border-white/10 rounded-[28px] shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 relative backdrop-blur-2xl">
+    <div className="w-full max-w-[840px] bg-[#0c0d12] border border-white/10 rounded-[24px] shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 relative backdrop-blur-2xl">
       {/* Close Button */}
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 z-30 p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+          className="absolute top-4 right-4 z-30 p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
           aria-label="Close"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
       )}
 
       {/* Left Column: Sign In Form */}
-      <div className="p-8 sm:p-12 flex flex-col justify-between">
+      <div className="p-6 sm:p-8 md:p-9 flex flex-col justify-between">
         <div>
           {/* Top Logo Icon */}
-          <div className="mb-8 flex items-center gap-1.5">
+          <div className="mb-5 flex items-center gap-1.5">
             <div className="flex flex-col gap-1">
               <div className="flex gap-1">
                 <span className="w-2.5 h-2.5 rounded-[3px] bg-white" />
@@ -79,10 +79,10 @@ export default function LoginPage({ onSwitchToSignUp, onSwitchToForgotPassword, 
             </div>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-2">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mb-1.5">
             Welcome back!
           </h2>
-          <p className="text-gray-400 text-xs sm:text-sm leading-relaxed mb-6">
+          <p className="text-gray-400 text-xs sm:text-xs leading-relaxed mb-4">
             Sign in to continue discovering scholarships that match your profile.
           </p>
 
@@ -91,16 +91,16 @@ export default function LoginPage({ onSwitchToSignUp, onSwitchToForgotPassword, 
             <motion.div
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2.5 mb-4"
+              className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2.5 mb-3.5"
             >
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{errorMsg}</span>
             </motion.div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+              <label className="block text-xs font-semibold text-gray-300 mb-1">
                 Email *
               </label>
               <input
@@ -112,12 +112,12 @@ export default function LoginPage({ onSwitchToSignUp, onSwitchToForgotPassword, 
                   if (errorMsg) setErrorMsg(null);
                 }}
                 placeholder="youremail@yourdomain.com"
-                className="w-full px-4 py-3 rounded-xl bg-[#14161f] border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#14161f] border border-white/5 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all"
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-gray-300">
                   Password *
                 </label>
@@ -138,13 +138,14 @@ export default function LoginPage({ onSwitchToSignUp, onSwitchToForgotPassword, 
                     setPassword(e.target.value);
                     if (errorMsg) setErrorMsg(null);
                   }}
-                  placeholder="Enter your password"
-                  className="w-full px-4 py-3 rounded-xl bg-[#14161f] border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all pr-10"
+                  placeholder="••••••••"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-[#14161f] border border-white/5 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                  tabIndex="-1"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -154,7 +155,7 @@ export default function LoginPage({ onSwitchToSignUp, onSwitchToForgotPassword, 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-500 via-indigo-600 to-emerald-400 hover:from-cyan-600 hover:to-emerald-500 text-white font-bold rounded-xl text-sm transition-all duration-200 shadow-xl shadow-cyan-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-indigo-600 to-emerald-400 hover:from-cyan-600 hover:to-emerald-500 text-white font-bold text-xs sm:text-sm transition-all duration-200 shadow-xl shadow-cyan-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
               {loading ? (
                 <div className="flex items-center gap-2">

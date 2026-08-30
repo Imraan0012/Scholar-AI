@@ -43,7 +43,7 @@ export default function AuthModal({ isOpen, initialMode = 'signin', onClose, onA
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative z-10 w-full max-w-4xl my-auto"
+          className="relative z-10 w-full max-w-[840px] my-auto"
         >
           {mode === 'signin' && (
             <LoginPage

@@ -40,18 +40,18 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
   };
 
   return (
-    <section id="hero" className="relative min-h-[85vh] pt-28 pb-14 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 overflow-hidden z-10">
+    <section id="hero" className="relative min-h-[75vh] pt-24 pb-10 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 overflow-hidden z-10">
 
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="w-full max-w-4xl flex flex-col items-center"
+        className="w-full max-w-3xl flex flex-col items-center"
       >
         {/* Top Tagline Pill with Live Pulse */}
         <motion.div
           variants={itemVariants}
-          className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#101322]/80 border border-indigo-500/30 text-indigo-200 text-xs sm:text-xs font-semibold mb-6 shadow-lg shadow-indigo-950/40 hover:border-indigo-400/50 transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#101322]/80 border border-indigo-500/30 text-indigo-200 text-xs font-semibold mb-4 shadow-lg shadow-indigo-950/40 hover:border-indigo-400/50 transition-colors"
         >
           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
           <span className="text-emerald-400 font-bold">
@@ -63,7 +63,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Main Headline with FlipWords */}
         <motion.h1
           variants={itemVariants}
-          className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-center tracking-tight text-white max-w-4xl leading-[1.15]"
+          className="text-2xl sm:text-3xl md:text-4xl lg:text-[46px] font-extrabold text-center tracking-tight text-white max-w-3xl leading-[1.15]"
         >
           Find Scholarships <br className="hidden sm:inline" />
           <FlipWords
@@ -77,7 +77,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Clear Domain-Specific Supporting Text */}
         <motion.p
           variants={itemVariants}
-          className="mt-4 text-xs sm:text-sm md:text-base text-gray-300 text-center max-w-2xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
+          className="mt-3 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
         >
           Tell Scholar AI about yourself and discover verified Indian scholarships matched directly to your <strong className="text-white font-semibold">academic profile, family income, reservation category, course, and state domicile</strong>.
         </motion.p>
@@ -85,24 +85,24 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Dominant Call To Action Bar with Magnetic hover */}
         <motion.div
           variants={itemVariants}
-          className="mt-8 flex flex-col sm:flex-row items-center gap-3.5 z-20"
+          className="mt-6 flex flex-col sm:flex-row items-center gap-3 z-20"
         >
           <MagneticButton strength={0.25} onClick={onCheckEligibilityClick}>
             <HoverBorderGradient
               as="div"
               containerClassName="rounded-full shadow-xl shadow-indigo-500/20"
-              className="bg-gradient-to-r from-indigo-950 via-slate-900 to-zinc-950 text-white font-bold text-sm sm:text-base px-7 py-3 flex items-center gap-2.5 group cursor-pointer"
+              className="bg-gradient-to-r from-indigo-950 via-slate-900 to-zinc-950 text-white font-bold text-xs sm:text-sm px-6 py-2.5 flex items-center gap-2 group cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-cyan-400 group-hover:rotate-12 transition-transform duration-300" />
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform duration-300" />
               <span>Check My Eligibility</span>
-              <ArrowRight className="w-4 h-4 text-indigo-300 group-hover:translate-x-1.5 transition-transform duration-300" />
+              <ArrowRight className="w-3.5 h-3.5 text-indigo-300 group-hover:translate-x-1.5 transition-transform duration-300" />
             </HoverBorderGradient>
           </MagneticButton>
 
           {!currentUser && (
             <button
               onClick={() => onAuthClick?.('signup')}
-              className="text-xs sm:text-sm font-semibold text-white px-5 py-3 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-md"
+              className="text-xs font-semibold text-white px-4 py-2.5 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-md"
             >
               <span>Create Free Account</span>
               <ChevronRight className="w-3.5 h-3.5 text-cyan-400" />

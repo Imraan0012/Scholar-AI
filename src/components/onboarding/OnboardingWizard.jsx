@@ -575,14 +575,13 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
     <div className="min-h-screen bg-[#F9FAFB] text-slate-900 font-sans antialiased border-t-2 border-slate-900 selection:bg-blue-600 selection:text-white flex flex-col justify-start">
       {/* Expanded Main Container (1200px max-width) */}
       <div className="w-full max-w-[1220px] mx-auto px-4 sm:px-8 lg:px-12 pt-2 sm:pt-4 pb-12">
-        
-        {/* Header */}
-        <header className="h-[72px] flex items-center justify-between border-b border-slate-200/80 mb-7 sm:mb-9">
-          <div className="flex items-center gap-3">
-            <div className="w-[32px] h-[32px] rounded-[8px] bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm select-none">
+        {/* Top Clean Minimal Navbar */}
+        <header className="h-[56px] flex items-center justify-between border-b border-slate-200/80 mb-5 sm:mb-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-[28px] h-[28px] rounded-[7px] bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm select-none">
               S
             </div>
-            <span className="text-[16px] sm:text-[17px] font-bold text-slate-900 tracking-[-0.01em]">
+            <span className="text-sm sm:text-base font-bold text-slate-900 tracking-[-0.01em]">
               Scholar AI
             </span>
           </div>
@@ -590,35 +589,35 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
           <button
             type="button"
             onClick={onCancel}
-            className="text-[13.5px] font-medium text-slate-500 hover:text-slate-900 transition-colors py-2 px-3 rounded-md hover:bg-slate-100/80 cursor-pointer"
+            className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors py-1.5 px-2.5 rounded-md hover:bg-slate-100/80 cursor-pointer"
           >
             Exit to home
           </button>
         </header>
 
         {/* ── MAIN TWO-COLUMN ONBOARDING GRID (45% Left / 55% Right) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 xl:gap-18 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
           
           {/* LEFT COLUMN: PROGRESS TIMELINE */}
           <aside className="lg:col-span-5 w-full">
-            <h1 className="text-[30px] sm:text-[34px] lg:text-[38px] font-bold text-slate-900 leading-[1.1] tracking-[-0.025em]">
+            <h1 className="text-2xl sm:text-3xl lg:text-[30px] font-bold text-slate-900 leading-[1.15] tracking-[-0.025em]">
               Let's find the scholarships<br className="hidden sm:inline" /> you're eligible for.
             </h1>
 
-            <p className="mt-4 text-[14.5px] sm:text-[15px] text-slate-500 leading-[1.6] max-w-[460px]">
+            <p className="mt-2.5 text-xs sm:text-sm text-slate-500 leading-relaxed max-w-[420px]">
               We'll ask you a few questions about your education, financial background and other details to find scholarships that fit your profile.
             </p>
 
             {/* Progress Stepper Section */}
-            <div className="mt-10 sm:mt-11">
-              <span className="text-[11px] font-bold tracking-[0.08em] text-slate-400 uppercase mb-6 block">
+            <div className="mt-6 sm:mt-8">
+              <span className="text-[10.5px] font-bold tracking-[0.08em] text-slate-400 uppercase mb-4 block">
                 GETTING STARTED
               </span>
 
               {/* Vertical Step Timeline */}
               <div className="relative space-y-0">
                 <div
-                  className="absolute left-[15px] top-[16px] bottom-[24px] w-[2px] bg-slate-200 pointer-events-none"
+                  className="absolute left-[13px] top-[14px] bottom-[20px] w-[2px] bg-slate-200 pointer-events-none"
                   aria-hidden="true"
                 />
 
@@ -632,23 +631,23 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                       onClick={() => {
                         if (isCompleted) jumpToStep(step.id);
                       }}
-                      className={`relative flex items-start gap-4 pb-7 sm:pb-8 last:pb-0 ${
+                      className={`relative flex items-start gap-3.5 pb-5 sm:pb-6 last:pb-0 ${
                         isCompleted ? 'cursor-pointer group' : ''
                       }`}
                     >
                       {/* Step Circle */}
                       <div className="relative z-10 flex-shrink-0 pt-0.5">
                         {isCompleted ? (
-                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center transition-all shadow-sm">
-                            <Check className="w-4 h-4 stroke-[2.5]" />
+                          <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center transition-all shadow-sm">
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                           </div>
                         ) : isCurrent ? (
-                          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center ring-4 ring-blue-100 transition-all shadow-sm">
-                            <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center ring-4 ring-blue-100 transition-all shadow-sm">
+                            <div className="w-2 h-2 rounded-full bg-white" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center transition-colors">
-                            <span className="text-[11.5px] font-semibold text-slate-400">
+                          <div className="w-7 h-7 rounded-full bg-white border border-slate-300 flex items-center justify-center transition-colors">
+                            <span className="text-[11px] font-semibold text-slate-400">
                               0{step.id}
                             </span>
                           </div>
@@ -656,10 +655,10 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                       </div>
 
                       {/* Step Labels */}
-                      <div className="flex-1 min-w-0 pt-1">
+                      <div className="flex-1 min-w-0 pt-0.5">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`text-[14.5px] sm:text-[15px] font-semibold leading-none transition-colors ${
+                            className={`text-xs sm:text-sm font-semibold leading-none transition-colors ${
                               isCurrent
                                 ? 'text-blue-600'
                                 : isCompleted
@@ -672,7 +671,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                         </div>
 
                         <p
-                          className={`text-[12.5px] sm:text-[13px] mt-1.5 leading-snug transition-colors ${
+                          className={`text-[11.5px] sm:text-xs mt-1 leading-snug transition-colors ${
                             isCurrent
                               ? 'text-slate-500'
                               : isCompleted
@@ -692,10 +691,10 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
 
           {/* RIGHT COLUMN: INTERACTIVE FORM CARD */}
           <main className="lg:col-span-7 w-full">
-            <div className="bg-white rounded-[16px] border border-[#E2E8F0] p-6 sm:p-9 lg:p-10 shadow-[0_1px_4px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] w-full">
+            <div className="bg-white rounded-[16px] border border-[#E2E8F0] p-5 sm:p-7 lg:p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03),0_1px_2px_rgba(0,0,0,0.02)] w-full">
               {saveError && (
-                <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold flex items-center gap-2.5">
-                  <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+                <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
                   <span>{saveError}</span>
                 </div>
               )}
