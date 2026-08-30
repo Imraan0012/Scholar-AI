@@ -1,5 +1,5 @@
-// =============================================================================
-// SCHOLAR AI — SUPABASE POSTGRESQL SCHEMA INITIALIZER & DATA SEEDER
+﻿// =============================================================================
+// SCHOLAR AI â€” SUPABASE POSTGRESQL SCHEMA INITIALIZER & DATA SEEDER
 // =============================================================================
 
 import fs from 'fs';
@@ -16,23 +16,23 @@ const dbConfig = {
   user: 'postgres',
   host: 'db.gixgyrsyopwtfgxvfglp.supabase.co',
   database: 'postgres',
-  password: 'Luckychamp@007',
+  password: process.env.SUPABASE_DB_PASSWORD,
   port: 5432,
   ssl: { rejectUnauthorized: false }
 };
 
 async function main() {
-  console.log('🔗 Connecting to Supabase PostgreSQL at db.gixgyrsyopwtfgxvfglp.supabase.co...');
+  console.log('ðŸ”— Connecting to Supabase PostgreSQL at db.gixgyrsyopwtfgxvfglp.supabase.co...');
   const client = new Client(dbConfig);
 
   try {
     await client.connect();
-    console.log('✅ Connected to Supabase PostgreSQL successfully!');
+    console.log('âœ… Connected to Supabase PostgreSQL successfully!');
 
     // 1. Read and apply schema.sql
     const schemaPath = path.join(__dirname, '../supabase/schema.sql');
     const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
-    console.log('📦 Applying database schema from supabase/schema.sql...');
+    console.log('ðŸ“¦ Applying database schema from supabase/schema.sql...');
     
     // Drop old tables to ensure clean constraint updates
     await client.query(`
@@ -45,10 +45,10 @@ async function main() {
     `);
     
     await client.query(schemaSql);
-    console.log('✅ Database schema and tables created successfully!');
+    console.log('âœ… Database schema and tables created successfully!');
 
     // 2. Seed verified scholarships into 'scholarships' table
-    console.log(`🌱 Seeding ${MASTER_SCHOLARSHIP_REGISTRY.length} verified scholarships into database...`);
+    console.log(`ðŸŒ± Seeding ${MASTER_SCHOLARSHIP_REGISTRY.length} verified scholarships into database...`);
 
     for (const sch of MASTER_SCHOLARSHIP_REGISTRY) {
       const query = `
@@ -137,16 +137,16 @@ async function main() {
       }
     }
 
-    console.log('✨ All scholarships, rules, and documents seeded into Supabase successfully!');
+    console.log('âœ¨ All scholarships, rules, and documents seeded into Supabase successfully!');
 
     // Fetch counts from database to verify
     const countRes = await client.query('SELECT COUNT(*) FROM scholarships');
     const rulesCountRes = await client.query('SELECT COUNT(*) FROM scholarship_eligibility_rules');
-    console.log(`📊 Total scholarships in database: ${countRes.rows[0].count}`);
-    console.log(`📊 Total rules in database: ${rulesCountRes.rows[0].count}`);
+    console.log(`ðŸ“Š Total scholarships in database: ${countRes.rows[0].count}`);
+    console.log(`ðŸ“Š Total rules in database: ${rulesCountRes.rows[0].count}`);
 
   } catch (err) {
-    console.error('❌ Database operation error:', err);
+    console.error('âŒ Database operation error:', err);
   } finally {
     await client.end();
   }

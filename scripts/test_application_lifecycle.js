@@ -1,8 +1,8 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 const { Client } = pg;
 
 const client = new Client({
-  connectionString: 'postgresql://postgres:Luckychamp%40007@db.gixgyrsyopwtfgxvfglp.supabase.co:5432/postgres',
+  connectionString: 'process.env.SUPABASE_DB_URL',
   ssl: { rejectUnauthorized: false }
 });
 
@@ -17,7 +17,7 @@ async function main() {
   if (parseInt(countRes.rows[0].count, 10) !== 0) {
     throw new Error('Expected 0 applications in DB!');
   }
-  console.log('✓ PASS: User starts with strictly 0 applications.');
+  console.log('âœ“ PASS: User starts with strictly 0 applications.');
 
   console.log('=== 2. VERIFY SPRING BOOT DASHBOARD SUMMARY API ===');
   const dashResp = await fetch('http://localhost:8000/api/dashboard/summary', {
@@ -29,7 +29,7 @@ async function main() {
   if (dashJson.data.activeApplications !== 0) {
     throw new Error(`Expected activeApplications to be 0, got ${dashJson.data.activeApplications}`);
   }
-  console.log('✓ PASS: Dashboard API reports activeApplications = 0.');
+  console.log('âœ“ PASS: Dashboard API reports activeApplications = 0.');
 
   console.log('=== 3. TEST CREATING AN APPLICATION VIA API (Apply Now) ===');
   const applyResp = await fetch('http://localhost:8000/api/applications/hdfc-badhte-kadam', {
@@ -48,7 +48,7 @@ async function main() {
   if (dbAfterApply.rows.length !== 1 || dbAfterApply.rows[0].status !== 'APPLIED') {
     throw new Error('Application was not created in DB properly!');
   }
-  console.log('✓ PASS: Exactly one application record created in Supabase with status APPLIED.');
+  console.log('âœ“ PASS: Exactly one application record created in Supabase with status APPLIED.');
 
   console.log('=== 4. TEST UPDATING APPLICATION STATUS (e.g. UNDER_REVIEW) ===');
   const updateResp = await fetch('http://localhost:8000/api/applications/hdfc-badhte-kadam', {
@@ -67,7 +67,7 @@ async function main() {
   if (dbAfterUpdate.rows[0].status !== 'UNDER_REVIEW') {
     throw new Error('Status was not updated in DB!');
   }
-  console.log('✓ PASS: Status successfully updated in Supabase to UNDER_REVIEW.');
+  console.log('âœ“ PASS: Status successfully updated in Supabase to UNDER_REVIEW.');
 
   console.log('=== 5. TEST DELETING APPLICATION (Remove from Tracker) ===');
   const deleteResp = await fetch('http://localhost:8000/api/applications/hdfc-badhte-kadam', {
@@ -82,7 +82,7 @@ async function main() {
   if (parseInt(dbAfterDelete.rows[0].count, 10) !== 0) {
     throw new Error('Application was not deleted from DB!');
   }
-  console.log('✓ PASS: Application successfully deleted from Supabase, count is 0.');
+  console.log('âœ“ PASS: Application successfully deleted from Supabase, count is 0.');
 
   await client.end();
   console.log('\n======================================================');

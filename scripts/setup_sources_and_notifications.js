@@ -1,10 +1,10 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 import { MASTER_SOURCES_REGISTRY } from '../src/data/sources/index.js';
 
 const { Client } = pg;
 
 const client = new Client({
-  connectionString: 'postgresql://postgres:Luckychamp%40007@db.gixgyrsyopwtfgxvfglp.supabase.co:5432/postgres',
+  connectionString: 'process.env.SUPABASE_DB_URL',
   ssl: { rejectUnauthorized: false }
 });
 
@@ -154,7 +154,7 @@ async function main() {
     await client.query(q, vals);
   }
 
-  console.log('✅ Seeded 61 scholarship sources successfully!');
+  console.log('âœ… Seeded 61 scholarship sources successfully!');
 
   // Verify Counts
   const srcCount = await client.query('SELECT count(*) FROM scholarship_sources WHERE active = true;');

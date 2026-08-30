@@ -1,8 +1,8 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 const { Client } = pg;
 
 const client = new Client({
-  connectionString: 'postgresql://postgres:Luckychamp%40007@db.gixgyrsyopwtfgxvfglp.supabase.co:5432/postgres',
+  connectionString: 'process.env.SUPABASE_DB_URL',
   ssl: { rejectUnauthorized: false }
 });
 

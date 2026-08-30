@@ -1,8 +1,8 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 const { Client } = pg;
 
 const client = new Client({
-  connectionString: 'postgresql://postgres:Luckychamp%40007@db.gixgyrsyopwtfgxvfglp.supabase.co:5432/postgres',
+  connectionString: 'process.env.SUPABASE_DB_URL',
   ssl: { rejectUnauthorized: false }
 });
 
@@ -100,7 +100,7 @@ async function main() {
     throw new Error('Completed profile score should be >= 80%!');
   }
 
-  console.log('✓ PASS: Both users start with 0 applications, 0 bookmarks, and dynamically calculated profile completion scores.');
+  console.log('âœ“ PASS: Both users start with 0 applications, 0 bookmarks, and dynamically calculated profile completion scores.');
 
   console.log('\n--- User A applies for 1 scholarship and bookmarks 1 scholarship ---');
   await fetch('http://localhost:8000/api/applications/nsp-pm-usp-csss', {
@@ -126,7 +126,7 @@ async function main() {
     throw new Error('User B was contaminated by User A data!');
   }
 
-  console.log('✓ PASS: User A counts updated to 1 application & 1 saved scholarship, while User B remains strictly isolated at 0!');
+  console.log('âœ“ PASS: User A counts updated to 1 application & 1 saved scholarship, while User B remains strictly isolated at 0!');
 
   // Cleanup test users
   await client.query('DELETE FROM student_applications WHERE student_id IN ($1, $2)', [userAId, userBId]);

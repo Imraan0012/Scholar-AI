@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import { supabase } from '../src/lib/supabaseClient.js';
 import { authService } from '../src/services/authService.js';
 

@@ -1,10 +1,10 @@
-import { dashboardCountsService } from '../src/services/dashboardCountsService.js';
+﻿import { dashboardCountsService } from '../src/services/dashboardCountsService.js';
 import { notificationService } from '../src/services/notificationService.js';
 import { sourceService } from '../src/services/sourceService.js';
 
 async function runTests() {
   console.log('=============================================================================');
-  console.log('SCHOLAR AI — SIDEBAR & DASHBOARD DYNAMIC COUNTS VERIFICATION SUITE');
+  console.log('SCHOLAR AI â€” SIDEBAR & DASHBOARD DYNAMIC COUNTS VERIFICATION SUITE');
   console.log('=============================================================================');
 
   // Test 1: Real scholarship count from database / registry
@@ -20,7 +20,7 @@ async function runTests() {
   if (srcCount === 57) {
     throw new Error('FAILED: Source count is still static 57!');
   }
-  console.log('✅ TEST 2 PASSED: Source count is dynamically fetched from scholarship_sources table (61 sources).');
+  console.log('âœ… TEST 2 PASSED: Source count is dynamically fetched from scholarship_sources table (61 sources).');
 
   // Test 3 & 4 & 5 & 6: User-specific notifications flow
   const testUserId1 = '00000000-0000-0000-0000-000000000001';
@@ -33,7 +33,7 @@ async function runTests() {
   if (initialUnread1 !== 0) {
     throw new Error('FAILED: Unread count should be 0 after marking all as read');
   }
-  console.log('✅ TEST 3 PASSED: Unread count drops to 0 when all are read (badge hides).');
+  console.log('âœ… TEST 3 PASSED: Unread count drops to 0 when all are read (badge hides).');
 
   // Add 1 unread notification for User 1
   const createdNotif1 = await notificationService.createNotification(testUserId1, {
@@ -46,7 +46,7 @@ async function runTests() {
   if (unreadAfterAdd1 !== 1) {
     throw new Error(`FAILED: Expected unread count 1, got ${unreadAfterAdd1}`);
   }
-  console.log('✅ TEST 4 PASSED: Adding unread notification increments count dynamically.');
+  console.log('âœ… TEST 4 PASSED: Adding unread notification increments count dynamically.');
 
   // Mark notification as read
   await notificationService.markAsRead(createdNotif1.id, testUserId1);
@@ -55,7 +55,7 @@ async function runTests() {
   if (unreadAfterRead1 !== 0) {
     throw new Error(`FAILED: Expected unread count 0, got ${unreadAfterRead1}`);
   }
-  console.log('✅ TEST 5 PASSED: Marking notification as read decrements badge count.');
+  console.log('âœ… TEST 5 PASSED: Marking notification as read decrements badge count.');
 
   // Add 3 notifications for User 2 to verify user isolation
   await notificationService.createNotification(testUserId2, { title: 'Alert 1', message: 'M1', type: 'INFO' });
@@ -69,7 +69,7 @@ async function runTests() {
   if (unreadUser2 < 3 || unreadUser1Check !== 0) {
     throw new Error('FAILED: User notifications are leaking across users!');
   }
-  console.log('✅ TEST 6 PASSED: User notification counts are strictly isolated per authenticated user.');
+  console.log('âœ… TEST 6 PASSED: User notification counts are strictly isolated per authenticated user.');
 
   // Test 7: Logged out / guest user
   const loggedOutCount = await dashboardCountsService.getUnreadNotificationCount(null);
@@ -77,7 +77,7 @@ async function runTests() {
   if (loggedOutCount !== 0) {
     throw new Error('FAILED: Logged out user should not see notification badges');
   }
-  console.log('✅ TEST 7 PASSED: Logged out users have 0 unread count (no private count displayed).');
+  console.log('âœ… TEST 7 PASSED: Logged out users have 0 unread count (no private count displayed).');
 
   // Test 8: getAllCounts unified call
   const unified = await dashboardCountsService.getAllCounts(testUserId2);
@@ -85,10 +85,10 @@ async function runTests() {
   if (!unified.scholarshipCount || !unified.sourceCount || typeof unified.unreadNotificationCount !== 'number') {
     throw new Error('FAILED: Unified counts missing fields');
   }
-  console.log('✅ TEST 8 PASSED: Centralized dashboardCountsService returns unified counts single source of truth.');
+  console.log('âœ… TEST 8 PASSED: Centralized dashboardCountsService returns unified counts single source of truth.');
 
   console.log('=============================================================================');
-  console.log('🎉 ALL 8 TESTS PASSED SUCCESSFULLY! ZERO STATIC COUNTERS REMAINING.');
+  console.log('ðŸŽ‰ ALL 8 TESTS PASSED SUCCESSFULLY! ZERO STATIC COUNTERS REMAINING.');
   console.log('=============================================================================');
 }
 

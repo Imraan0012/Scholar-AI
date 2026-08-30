@@ -1,11 +1,11 @@
-import pg from 'pg';
+﻿import pg from 'pg';
 const { Client } = pg;
 
 // Try pooler first, then direct
 const connectionStrings = [
-  'postgresql://postgres.gixgyrsyopwtfgxvfglp:Luckychamp%40007@aws-0-ap-south-1.pooler.supabase.com:6543/postgres',
-  'postgresql://postgres.gixgyrsyopwtfgxvfglp:Luckychamp%40007@aws-0-ap-south-1.pooler.supabase.com:5432/postgres',
-  'postgresql://postgres:Luckychamp%40007@db.gixgyrsyopwtfgxvfglp.supabase.co:5432/postgres'
+  'postgresql://postgres.gixgyrsyopwtfgxvfglp:process.env.SUPABASE_DB_PASSWORD@aws-0-ap-south-1.pooler.supabase.com:6543/postgres',
+  'postgresql://postgres.gixgyrsyopwtfgxvfglp:process.env.SUPABASE_DB_PASSWORD@aws-0-ap-south-1.pooler.supabase.com:5432/postgres',
+  'process.env.SUPABASE_DB_URL'
 ];
 
 async function main() {
@@ -18,7 +18,7 @@ async function main() {
         ssl: { rejectUnauthorized: false }
       });
       await client.connect();
-      console.log('✅ Connected successfully!');
+      console.log('âœ… Connected successfully!');
       break;
     } catch (e) {
       console.warn('Connection failed:', e.message);
@@ -27,7 +27,7 @@ async function main() {
   }
 
   if (!client) {
-    console.error('❌ Could not connect to PostgreSQL directly');
+    console.error('âŒ Could not connect to PostgreSQL directly');
     return;
   }
 
@@ -39,7 +39,7 @@ async function main() {
         updated_at = NOW()
     WHERE email_confirmed_at IS NULL OR confirmed_at IS NULL;
   `);
-  console.log(`✅ Auto-confirmed ${updateRes.rowCount} users in auth.users!`);
+  console.log(`âœ… Auto-confirmed ${updateRes.rowCount} users in auth.users!`);
 
   // 2. Create RPC function public.auto_confirm_student
   await client.query(`
@@ -68,14 +68,14 @@ async function main() {
 
     GRANT EXECUTE ON FUNCTION public.auto_confirm_student(TEXT) TO anon, authenticated, service_role;
   `);
-  console.log('✅ Created/Updated public.auto_confirm_student RPC');
+  console.log('âœ… Created/Updated public.auto_confirm_student RPC');
 
   // 3. Inspect existing users
   const usersRes = await client.query(`
     SELECT id, email, created_at, email_confirmed_at, confirmed_at, raw_user_meta_data
     FROM auth.users;
   `);
-  console.log(`📊 Total registered users in Supabase auth.users: ${usersRes.rows.length}`);
+  console.log(`ðŸ“Š Total registered users in Supabase auth.users: ${usersRes.rows.length}`);
   usersRes.rows.forEach(u => {
     console.log(` - Email: ${u.email} | Confirmed: ${u.email_confirmed_at ? 'YES (' + u.email_confirmed_at + ')' : 'NO'}`);
   });

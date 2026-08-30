@@ -1,11 +1,11 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import { authService } from '../src/services/authService.js';
 import pg from 'pg';
 const { Client } = pg;
 
 async function testE2E() {
   const pgClient = new Client({
-    connectionString: 'postgresql://postgres:Luckychamp%40007@db.gixgyrsyopwtfgxvfglp.supabase.co:5432/postgres',
+    connectionString: 'process.env.SUPABASE_DB_URL',
     ssl: { rejectUnauthorized: false }
   });
   await pgClient.connect();
@@ -23,7 +23,7 @@ async function testE2E() {
   if (!res1.success || !res1.user) {
     throw new Error('Sign up failed!');
   }
-  console.log('✅ First-time Sign Up succeeded with authenticated user and session!');
+  console.log('âœ… First-time Sign Up succeeded with authenticated user and session!');
 
   console.log('\n--- Testing Duplicate Sign Up for same email ---');
   const res2 = await authService.signUp({
@@ -36,7 +36,7 @@ async function testE2E() {
   if (res2.success || !res2.isDuplicate) {
     throw new Error('Duplicate detection failed!');
   }
-  console.log('✅ Duplicate detection succeeded with message:', res2.message);
+  console.log('âœ… Duplicate detection succeeded with message:', res2.message);
 
   console.log('\n--- Testing Native Sign In for created account ---');
   const res3 = await authService.signIn({
@@ -52,7 +52,7 @@ async function testE2E() {
   if (!res3.success || !res3.user) {
     throw new Error('Sign in failed!');
   }
-  console.log('✅ Native Sign In succeeded perfectly!');
+  console.log('âœ… Native Sign In succeeded perfectly!');
 }
 
 testE2E().catch(err => {
