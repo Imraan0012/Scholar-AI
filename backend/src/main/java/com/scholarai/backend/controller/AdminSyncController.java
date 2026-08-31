@@ -19,7 +19,7 @@ public class AdminSyncController {
 
     private final ScholarshipSyncService syncService;
 
-    @Value("${app.scheduler.secret:${SCHEDULER_SECRET:scholar-ai-sync-2026}}")
+    @Value("${scheduler.secret:${SCHEDULER_SECRET:}}")
     private String schedulerSecret;
 
     private final ScholarshipDiscoveryService discoveryService;

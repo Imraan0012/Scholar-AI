@@ -18,7 +18,7 @@ jobs:
       - name: Trigger Spring Boot Sync Endpoint with Cold-Start Resilience
         env:
           BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-l8uc.onrender.com' }}
-          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET || 'scholar-ai-sync-2026' }}
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
         run: |
           echo "Starting 12-hour official scholarship sync pipeline..."
           ENDPOINT="${BACKEND_URL}/api/admin/sync/scholarships"
