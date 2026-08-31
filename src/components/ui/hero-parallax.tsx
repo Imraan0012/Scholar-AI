@@ -106,7 +106,7 @@ export const Header = () => {
   return (
     <div className="max-w-7xl relative mx-auto py-20 md:py-32 px-4 w-full left-0 top-0 text-center md:text-left">
       <span className="text-xs font-bold uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-3.5 py-1.5 rounded-full border border-cyan-500/20 inline-block mb-4">
-        12,500+ Verified Scholarships Mapped
+        Verified Indian & Global Scholarships Mapped
       </span>
       <h1 className="text-3xl sm:text-6xl md:text-7xl font-extrabold text-white tracking-tight leading-tight">
         Discover Verified <br />

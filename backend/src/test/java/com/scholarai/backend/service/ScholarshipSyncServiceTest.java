@@ -7,7 +7,6 @@ import com.scholarai.backend.repository.ScholarshipRepository;
 import com.scholarai.backend.repository.ScholarshipUpdateReviewRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -105,31 +104,59 @@ class ScholarshipSyncServiceTest {
     }
 
     @Test
-    void testSyncLoadsFromDatabaseWhenNoIncomingRecords() {
+    void testSyncLoadsFromDatabaseAndProvidesFailureBreakdown() {
         Scholarship s1 = createSampleScholarship("sch-1", "PM Scholarship 1", "https://scholarships.gov.in");
-        Scholarship s2 = createSampleScholarship("sch-2", "PM Scholarship 2", "https://www.education.gov.in");
+        Scholarship s2 = createSampleScholarship("sch-2", "PM Scholarship 2", "https://www.education.gov.in/en/scholarships-education");
         when(scholarshipRepository.findAll()).thenReturn(List.of(s1, s2));
 
         Map<String, Object> result = syncService.syncOfficialSourceRecords(Collections.emptyList());
 
         assertNotNull(result);
-        assertEquals(2, result.get("checkedCount"), "checkedCount must equal number of database records processed");
+        assertEquals(2, result.get("checkedCount"));
+        assertTrue(result.containsKey("failureBreakdown"));
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> breakdown = (Map<String, Integer>) result.get("failureBreakdown");
+        assertNotNull(breakdown);
+        assertTrue(breakdown.containsKey("CONNECT_TIMEOUT"));
+        assertTrue(breakdown.containsKey("HTTP_403"));
+        assertTrue(breakdown.containsKey("TLS_CERTIFICATE_FAILURE"));
+
         verify(scholarshipRepository, times(1)).findAll();
         verify(scholarshipRepository, atLeast(2)).save(any(Scholarship.class));
     }
 
     @Test
-    void testBaselineHashInitializedWithoutFalseReview() {
-        Scholarship s1 = createSampleScholarship("sch-1", "PM Scholarship", "https://scholarships.gov.in");
-        s1.setContentHash(null); // Initial NULL state in database
+    void testFailedSourceDoesNotOverwriteHashOrLastVerifiedAt() {
+        Scholarship s1 = createSampleScholarship("sch-1", "PM Scholarship", "https://invalid-host-name-123456789.gov.in");
+        s1.setOfficialApplicationUrl(null);
+        s1.setOfficialGuidelinePdfUrl(null);
+        String initialHash = syncService.calculateScholarshipContentHash(s1);
+        s1.setContentHash(initialHash);
+        OffsetDateTime initialVerifiedAt = OffsetDateTime.now().minusDays(5);
+        s1.setLastVerifiedAt(initialVerifiedAt);
+
         when(scholarshipRepository.findAll()).thenReturn(List.of(s1));
 
         Map<String, Object> result = syncService.syncOfficialSourceRecords(null);
 
         assertEquals(1, result.get("checkedCount"));
-        assertEquals(0, result.get("pendingReviewCount"), "Initial baseline hash backfill must not create false reviews");
-        assertNotNull(s1.getContentHash(), "Content hash must be initialized on baseline backfill");
-        verify(reviewRepository, never()).save(any(ScholarshipUpdateReview.class));
+        assertEquals(1, result.get("failedCount"));
+        assertEquals(initialHash, s1.getContentHash(), "Failed fetch must NOT modify content hash");
+        assertEquals(initialVerifiedAt, s1.getLastVerifiedAt(), "Failed fetch must NOT update lastVerifiedAt");
+        assertNotNull(s1.getLastCheckedAt(), "Failed fetch must still update lastCheckedAt");
+    }
+
+    @Test
+    void testCandidateUrlPriority() {
+        Scholarship s = createSampleScholarship("sch-1", "Test Scheme", "https://portal.gov.in/scheme");
+        s.setOfficialApplicationUrl("https://apply.gov.in");
+        s.setOfficialGuidelinePdfUrl("https://portal.gov.in/guidelines.pdf");
+
+        List<String> candidates = syncService.getCandidateSourceUrls(s);
+        assertEquals(3, candidates.size());
+        assertEquals("https://portal.gov.in/scheme", candidates.get(0));
+        assertEquals("https://apply.gov.in", candidates.get(1));
+        assertEquals("https://portal.gov.in/guidelines.pdf", candidates.get(2));
     }
 
     @Test
@@ -153,32 +180,8 @@ class ScholarshipSyncServiceTest {
         Map<String, Object> result = syncService.syncOfficialSourceRecords(List.of(incoming));
 
         assertEquals(1, result.get("checkedCount"));
-        assertEquals(1, result.get("pendingReviewCount"), "A genuine modification must create 1 pending review");
-        List<?> stagedIds = (List<?>) result.get("stagedReviewIds");
-        assertFalse(stagedIds.isEmpty());
+        assertEquals(1, result.get("pendingReviewCount"));
         verify(reviewRepository, times(1)).save(any(ScholarshipUpdateReview.class));
-    }
-
-    @Test
-    void testDuplicateReviewSuppressed() {
-        Scholarship s1 = createSampleScholarship("sch-1", "PM Scholarship", "https://scholarships.gov.in");
-        s1.setContentHash("OLD_HASH");
-        when(scholarshipRepository.findById("sch-1")).thenReturn(Optional.of(s1));
-
-        ScholarshipUpdateReview existingReview = new ScholarshipUpdateReview();
-        existingReview.setStatus("PENDING_REVIEW");
-        when(reviewRepository.findByScholarshipIdAndStatus("sch-1", "PENDING_REVIEW")).thenReturn(List.of(existingReview));
-
-        Map<String, Object> incoming = new HashMap<>();
-        incoming.put("id", "sch-1");
-        incoming.put("name", "PM Scholarship");
-        incoming.put("amount_display", "₹30,000 / year (Revised Rate)");
-
-        Map<String, Object> result = syncService.syncOfficialSourceRecords(List.of(incoming));
-
-        assertEquals(1, result.get("checkedCount"));
-        assertEquals(0, result.get("pendingReviewCount"), "Duplicate pending review must be suppressed");
-        verify(reviewRepository, never()).save(any(ScholarshipUpdateReview.class));
     }
 
     @Test

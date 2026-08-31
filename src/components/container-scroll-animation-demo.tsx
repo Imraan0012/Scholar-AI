@@ -33,7 +33,7 @@ export default function HeroScrollDemo({ onCheckEligibilityClick }: { onCheckEli
               <span className="text-xs text-gray-400 font-mono ml-2">scholarai.in/engine/radar</span>
             </div>
             <span className="text-xs text-emerald-400 font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              Live Scan: 12,500+ Grants
+              Live Scan: Verified Official Portals
             </span>
           </div>
 

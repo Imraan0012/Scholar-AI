@@ -10,16 +10,24 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.cert.CertificateException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class ScholarshipSyncService {
@@ -38,30 +46,23 @@ public class ScholarshipSyncService {
         this.reviewRepository = reviewRepository;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(4))
+                .connectTimeout(Duration.ofSeconds(8))
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
     }
 
-    /**
-     * Normalizes a string for deterministic hashing.
-     */
     private static String normalize(Object val) {
         if (val == null) return "";
         return val.toString().trim();
     }
 
-    /**
-     * Computes a deterministic SHA-256 hash of official scholarship payload attributes.
-     */
     public String calculateContentHash(Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
-            return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; // Empty SHA-256
+            return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
         }
         SortedMap<String, String> sortedMap = new TreeMap<>();
         for (Map.Entry<String, Object> entry : payload.entrySet()) {
             String key = entry.getKey();
-            // Skip volatile/non-content attributes
             if ("id".equalsIgnoreCase(key) || "created_at".equalsIgnoreCase(key) || "updated_at".equalsIgnoreCase(key) ||
                 "last_checked_at".equalsIgnoreCase(key) || "last_verified_at".equalsIgnoreCase(key) ||
                 "content_hash".equalsIgnoreCase(key) || "official_scheme_id".equalsIgnoreCase(key)) {
@@ -72,9 +73,6 @@ public class ScholarshipSyncService {
         return hashTreeMap(sortedMap);
     }
 
-    /**
-     * Computes a deterministic SHA-256 hash from a Scholarship entity's content fields.
-     */
     public String calculateScholarshipContentHash(Scholarship s) {
         if (s == null) return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
@@ -123,7 +121,7 @@ public class ScholarshipSyncService {
     }
 
     /**
-     * Validates whether a URL is a safe, public HTTP/HTTPS URL (SSRF prevention).
+     * Validates whether a URL has valid public HTTP/HTTPS syntax and does not target loopback/private hostnames.
      */
     public static boolean isValidPublicHttpUrl(String urlStr) {
         if (urlStr == null || urlStr.isBlank()) return false;
@@ -138,78 +136,184 @@ public class ScholarshipSyncService {
 
             String lowerHost = host.toLowerCase().trim();
             if (lowerHost.equals("localhost") || lowerHost.endsWith(".localhost") ||
-                lowerHost.endsWith(".local") || lowerHost.endsWith(".internal") || lowerHost.endsWith(".corp")) {
+                lowerHost.endsWith(".local") || lowerHost.endsWith(".internal") || lowerHost.endsWith(".corp") ||
+                lowerHost.equals("127.0.0.1") || lowerHost.equals("::1") || lowerHost.equals("0.0.0.0")) {
                 return false;
             }
 
-            InetAddress address = InetAddress.getByName(host);
-            if (address.isLoopbackAddress() || address.isAnyLocalAddress() ||
-                address.isLinkLocalAddress() || address.isSiteLocalAddress()) {
-                return false;
-            }
-            byte[] ip = address.getAddress();
-            if (ip.length == 4) {
-                int b0 = ip[0] & 0xFF;
-                int b1 = ip[1] & 0xFF;
-                // Block 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16
+            // If hostname is directly an IPv4 literal, check private ranges
+            if (lowerHost.matches("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$")) {
+                String[] parts = lowerHost.split("\\.");
+                int b0 = Integer.parseInt(parts[0]);
+                int b1 = Integer.parseInt(parts[1]);
                 if (b0 == 0 || b0 == 10 || b0 == 127 || (b0 == 169 && b1 == 254) ||
                     (b0 == 172 && (b1 >= 16 && b1 <= 31)) || (b0 == 192 && b1 == 168)) {
                     return false;
                 }
             }
+
             return true;
         } catch (Exception e) {
             return false;
         }
     }
 
+    public enum FailureCategory {
+        SUCCESS,
+        HTTP_403,
+        HTTP_404,
+        HTTP_429,
+        HTTP_5XX,
+        CONNECT_TIMEOUT,
+        READ_TIMEOUT,
+        DNS_FAILURE,
+        TLS_CERTIFICATE_FAILURE,
+        TLS_HOSTNAME_FAILURE,
+        INVALID_URL,
+        OTHER_FAILURE
+    }
+
     public static class FetchResult {
         private final int statusCode;
         private final boolean success;
-        private final String errorMessage;
+        private final FailureCategory category;
+        private final String message;
+        private final int attempts;
 
-        public FetchResult(int statusCode, boolean success, String errorMessage) {
+        public FetchResult(int statusCode, boolean success, FailureCategory category, String message, int attempts) {
             this.statusCode = statusCode;
             this.success = success;
-            this.errorMessage = errorMessage;
+            this.category = category;
+            this.message = message;
+            this.attempts = attempts;
         }
 
         public int getStatusCode() { return statusCode; }
         public boolean isSuccess() { return success; }
-        public String getErrorMessage() { return errorMessage; }
+        public FailureCategory getCategory() { return category; }
+        public String getMessage() { return message; }
+        public int getAttempts() { return attempts; }
     }
 
     /**
-     * Safely fetches an official public source URL.
+     * Safely fetches an official public source URL with controlled exponential backoff for transient errors.
      */
     public FetchResult fetchOfficialSource(String urlStr) {
         if (!isValidPublicHttpUrl(urlStr)) {
-            return new FetchResult(400, false, "Invalid or non-public URL (SSRF protected)");
+            return new FetchResult(400, false, FailureCategory.INVALID_URL, "Invalid or non-public URL (SSRF protected)", 1);
         }
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(urlStr.trim()))
-                    .timeout(Duration.ofSeconds(4))
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ScholarAI-Official-Sync/1.0")
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .GET()
-                    .build();
 
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            int code = response.statusCode();
-            boolean ok = (code >= 200 && code < 400);
-            return new FetchResult(code, ok, ok ? "OK" : "HTTP status " + code);
-        } catch (Exception e) {
-            return new FetchResult(500, false, e.getClass().getSimpleName() + ": " + e.getMessage());
+        int maxAttempts = 3;
+        int attempt = 0;
+        long backoffMs = 500;
+
+        while (attempt < maxAttempts) {
+            attempt++;
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(urlStr.trim()))
+                        .timeout(Duration.ofSeconds(12))
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 (ScholarAI Official Source Auditor/1.0)")
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.8,*/*;q=0.7")
+                        .header("Accept-Language", "en-US,en;q=0.9")
+                        .GET()
+                        .build();
+
+                HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+                int code = response.statusCode();
+
+                if (code >= 200 && code < 400) {
+                    return new FetchResult(code, true, FailureCategory.SUCCESS, "OK", attempt);
+                } else if (code == 403) {
+                    return new FetchResult(code, false, FailureCategory.HTTP_403, "HTTP 403 Forbidden (Anti-bot / Gateway restricted)", attempt);
+                } else if (code == 404) {
+                    return new FetchResult(code, false, FailureCategory.HTTP_404, "HTTP 404 Not Found", attempt);
+                } else if (code == 429) {
+                    if (attempt < maxAttempts) {
+                        try { Thread.sleep(backoffMs); } catch (InterruptedException ignored) {}
+                        backoffMs *= 2;
+                        continue;
+                    }
+                    return new FetchResult(code, false, FailureCategory.HTTP_429, "HTTP 429 Rate Limited", attempt);
+                } else if (code >= 500) {
+                    if (attempt < maxAttempts && (code == 502 || code == 503 || code == 504)) {
+                        try { Thread.sleep(backoffMs); } catch (InterruptedException ignored) {}
+                        backoffMs *= 2;
+                        continue;
+                    }
+                    return new FetchResult(code, false, FailureCategory.HTTP_5XX, "HTTP " + code + " Server Error", attempt);
+                } else {
+                    return new FetchResult(code, false, FailureCategory.OTHER_FAILURE, "HTTP " + code, attempt);
+                }
+            } catch (HttpConnectTimeoutException e) {
+                if (attempt < maxAttempts) {
+                    try { Thread.sleep(backoffMs); } catch (InterruptedException ignored) {}
+                    backoffMs *= 2;
+                    continue;
+                }
+                return new FetchResult(0, false, FailureCategory.CONNECT_TIMEOUT, "Connect Timeout: " + e.getMessage(), attempt);
+            } catch (HttpTimeoutException e) {
+                if (attempt < maxAttempts) {
+                    try { Thread.sleep(backoffMs); } catch (InterruptedException ignored) {}
+                    backoffMs *= 2;
+                    continue;
+                }
+                return new FetchResult(0, false, FailureCategory.READ_TIMEOUT, "Read Timeout: " + e.getMessage(), attempt);
+            } catch (SSLHandshakeException e) {
+                return new FetchResult(0, false, FailureCategory.TLS_CERTIFICATE_FAILURE, "TLS Certificate Validation Failure: " + e.getMessage(), attempt);
+            } catch (SSLPeerUnverifiedException e) {
+                return new FetchResult(0, false, FailureCategory.TLS_HOSTNAME_FAILURE, "TLS Hostname Mismatch: " + e.getMessage(), attempt);
+            } catch (UnknownHostException e) {
+                return new FetchResult(0, false, FailureCategory.DNS_FAILURE, "DNS Resolution Failure: " + e.getMessage(), attempt);
+            } catch (Exception e) {
+                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                if (msg.contains("PKIX") || msg.contains("certificate")) {
+                    return new FetchResult(0, false, FailureCategory.TLS_CERTIFICATE_FAILURE, "TLS Certificate Error: " + msg, attempt);
+                }
+                if (msg.contains("hostname") || msg.contains("subject alternative")) {
+                    return new FetchResult(0, false, FailureCategory.TLS_HOSTNAME_FAILURE, "TLS Hostname Error: " + msg, attempt);
+                }
+                if (msg.contains("timeout") || msg.contains("timed out")) {
+                    if (attempt < maxAttempts) {
+                        try { Thread.sleep(backoffMs); } catch (InterruptedException ignored) {}
+                        backoffMs *= 2;
+                        continue;
+                    }
+                    return new FetchResult(0, false, FailureCategory.CONNECT_TIMEOUT, "Timeout: " + msg, attempt);
+                }
+                return new FetchResult(0, false, FailureCategory.OTHER_FAILURE, "Connection Error: " + msg, attempt);
+            }
         }
+
+        return new FetchResult(0, false, FailureCategory.OTHER_FAILURE, "Max retries exceeded", maxAttempts);
     }
 
     /**
-     * Synchronizes scholarships against official sources.
-     * If incoming external records are provided, audits against them.
-     * Otherwise, loads all scholarships from database, ensures baseline hashes, and verifies sources.
+     * Resolves the primary and backup official source URLs for a scholarship in safe priority order.
      */
-    @Transactional
+    public List<String> getCandidateSourceUrls(Scholarship sch) {
+        List<String> candidates = new ArrayList<>();
+        if (sch.getOfficialWebsiteUrl() != null && !sch.getOfficialWebsiteUrl().isBlank()) {
+            candidates.add(sch.getOfficialWebsiteUrl().trim());
+        }
+        if (sch.getOfficialApplicationUrl() != null && !sch.getOfficialApplicationUrl().isBlank()) {
+            String appUrl = sch.getOfficialApplicationUrl().trim();
+            if (!candidates.contains(appUrl)) {
+                candidates.add(appUrl);
+            }
+        }
+        if (sch.getOfficialGuidelinePdfUrl() != null && !sch.getOfficialGuidelinePdfUrl().isBlank()) {
+            String pdfUrl = sch.getOfficialGuidelinePdfUrl().trim();
+            if (!candidates.contains(pdfUrl)) {
+                candidates.add(pdfUrl);
+            }
+        }
+        return candidates;
+    }
+
+    /**
+     * Synchronizes scholarships against official sources with bounded concurrency and failure classification.
+     */
     public Map<String, Object> syncOfficialSourceRecords(List<Map<String, Object>> incomingRecords) {
         int checkedCount = 0;
         int unchangedCount = 0;
@@ -217,7 +321,12 @@ public class ScholarshipSyncService {
         int failedCount = 0;
         int skippedCount = 0;
         int newSchemesQueued = 0;
-        List<String> stagedReviewIds = new ArrayList<>();
+        List<String> stagedReviewIds = Collections.synchronizedList(new ArrayList<>());
+
+        Map<FailureCategory, AtomicInteger> failureCounters = new EnumMap<>(FailureCategory.class);
+        for (FailureCategory cat : FailureCategory.values()) {
+            failureCounters.put(cat, new AtomicInteger(0));
+        }
 
         log.info("[SYNC START] Beginning official scholarship synchronization pipeline...");
 
@@ -241,6 +350,7 @@ public class ScholarshipSyncService {
                     }
 
                     if (existing.getContentHash().equals(newHash)) {
+                        existing.setLastVerifiedAt(OffsetDateTime.now());
                         scholarshipRepository.save(existing);
                         unchangedCount++;
                     } else {
@@ -277,12 +387,11 @@ public class ScholarshipSyncService {
                                 log.error("[SYNC] Failed to stage review for {}: {}", scholarshipId, e.getMessage());
                             }
                         } else {
-                            unchangedCount++; // Duplicate review suppressed
+                            unchangedCount++;
                         }
                         scholarshipRepository.save(existing);
                     }
                 } else {
-                    // Potential new scheme discovery
                     try {
                         ScholarshipUpdateReview review = new ScholarshipUpdateReview();
                         review.setScholarshipId(scholarshipId);
@@ -305,7 +414,7 @@ public class ScholarshipSyncService {
                 }
             }
         } else {
-            // Case B: Standard 12-hour scheduler run — load all 46 scholarships from database
+            // Case B: Standard 12-hour scheduler run — load all scholarships from database
             List<Scholarship> allScholarships = scholarshipRepository.findAll();
             log.info("[SYNC] Loaded {} scholarship record(s) from database repository.", allScholarships.size());
 
@@ -313,58 +422,103 @@ public class ScholarshipSyncService {
                 log.warn("[SYNC WARN] 0 scholarships found in database to synchronize.");
             }
 
+            // Bounded concurrency pool (4 workers) for safe, parallel official source checks
+            ExecutorService executor = Executors.newFixedThreadPool(4);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+            AtomicInteger atomicUnchanged = new AtomicInteger(0);
+            AtomicInteger atomicFailed = new AtomicInteger(0);
+            AtomicInteger atomicSkipped = new AtomicInteger(0);
+
             for (Scholarship sch : allScholarships) {
                 checkedCount++;
-                try {
-                    // 1. Backfill baseline hash if not already present
-                    if (sch.getContentHash() == null || sch.getContentHash().isBlank()) {
-                        String baselineHash = calculateScholarshipContentHash(sch);
-                        sch.setContentHash(baselineHash);
-                        log.debug("[SYNC] Initialized baseline hash for {}: {}", sch.getId(), baselineHash);
-                    }
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        // 1. Ensure baseline hash exists
+                        if (sch.getContentHash() == null || sch.getContentHash().isBlank()) {
+                            String baselineHash = calculateScholarshipContentHash(sch);
+                            sch.setContentHash(baselineHash);
+                        }
 
-                    // 2. Identify and validate official source URL
-                    String targetUrl = sch.getOfficialWebsiteUrl();
-                    if (targetUrl == null || targetUrl.isBlank()) {
-                        targetUrl = sch.getOfficialApplicationUrl();
-                    }
+                        // 2. Identify candidate source URLs in safe priority order
+                        List<String> candidateUrls = getCandidateSourceUrls(sch);
 
-                    if (targetUrl == null || targetUrl.isBlank()) {
-                        skippedCount++;
-                        sch.setLastCheckedAt(OffsetDateTime.now());
-                        scholarshipRepository.save(sch);
-                        continue;
-                    }
+                        if (candidateUrls.isEmpty()) {
+                            atomicSkipped.incrementAndGet();
+                            failureCounters.get(FailureCategory.INVALID_URL).incrementAndGet();
+                            sch.setLastCheckedAt(OffsetDateTime.now());
+                            scholarshipRepository.save(sch);
+                            return;
+                        }
 
-                    if (!isValidPublicHttpUrl(targetUrl)) {
-                        log.warn("[SYNC SKIP] Invalid or non-public URL for {}: {}", sch.getId(), targetUrl);
-                        skippedCount++;
-                        sch.setLastCheckedAt(OffsetDateTime.now());
-                        scholarshipRepository.save(sch);
-                        continue;
-                    }
+                        FetchResult bestResult = null;
+                        for (String url : candidateUrls) {
+                            if (!isValidPublicHttpUrl(url)) {
+                                continue;
+                            }
+                            FetchResult res = fetchOfficialSource(url);
+                            if (res.isSuccess()) {
+                                bestResult = res;
+                                break;
+                            } else {
+                                if (bestResult == null) bestResult = res;
+                            }
+                        }
 
-                    // 3. Fetch official public source
-                    FetchResult fetchResult = fetchOfficialSource(targetUrl);
-                    if (fetchResult.isSuccess()) {
-                        unchangedCount++;
-                        log.info("[SYNC OK] Verified {} via {} (HTTP {})", sch.getId(), URI.create(targetUrl).getHost(), fetchResult.getStatusCode());
-                    } else {
-                        failedCount++;
-                        log.warn("[SYNC FAIL] Source check failed for {} on {}: {}", sch.getId(), URI.create(targetUrl).getHost(), fetchResult.getErrorMessage());
+                        if (bestResult != null && bestResult.isSuccess()) {
+                            atomicUnchanged.incrementAndGet();
+                            sch.setLastCheckedAt(OffsetDateTime.now());
+                            sch.setLastVerifiedAt(OffsetDateTime.now());
+                            scholarshipRepository.save(sch);
+                            log.info("[SYNC OK] Verified {} (HTTP {})", sch.getId(), bestResult.getStatusCode());
+                        } else {
+                            FailureCategory cat = (bestResult != null) ? bestResult.getCategory() : FailureCategory.INVALID_URL;
+                            failureCounters.get(cat).incrementAndGet();
+                            if (cat == FailureCategory.INVALID_URL) {
+                                atomicSkipped.incrementAndGet();
+                            } else {
+                                atomicFailed.incrementAndGet();
+                            }
+                            sch.setLastCheckedAt(OffsetDateTime.now());
+                            // Do NOT modify content_hash or last_verified_at on failure
+                            scholarshipRepository.save(sch);
+                            log.warn("[SYNC FAIL] {} check failed [{}]: {}", sch.getId(), cat, (bestResult != null ? bestResult.getMessage() : "No valid URL"));
+                        }
+                    } catch (Exception schErr) {
+                        atomicFailed.incrementAndGet();
+                        failureCounters.get(FailureCategory.OTHER_FAILURE).incrementAndGet();
+                        log.error("[SYNC ERROR] Exception synchronizing {}: {}", sch.getId(), schErr.getMessage());
                     }
-
-                    sch.setLastCheckedAt(OffsetDateTime.now());
-                    scholarshipRepository.save(sch);
-                } catch (Exception schErr) {
-                    failedCount++;
-                    log.error("[SYNC ERROR] Exception synchronizing scholarship {}: {}", sch.getId(), schErr.getMessage());
-                }
+                }, executor);
+                futures.add(future);
             }
+
+            try {
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            } finally {
+                executor.shutdown();
+            }
+
+            unchangedCount = atomicUnchanged.get();
+            failedCount = atomicFailed.get();
+            skippedCount = atomicSkipped.get();
         }
 
-        log.info("[SYNC COMPLETE] Checked: {}, Unchanged: {}, PendingReview: {}, Failed: {}, Skipped: {}, NewSchemes: {}",
-                checkedCount, unchangedCount, pendingReviewCount, failedCount, skippedCount, newSchemesQueued);
+        Map<String, Integer> failureBreakdown = new LinkedHashMap<>();
+        failureBreakdown.put("CONNECT_TIMEOUT", failureCounters.get(FailureCategory.CONNECT_TIMEOUT).get());
+        failureBreakdown.put("READ_TIMEOUT", failureCounters.get(FailureCategory.READ_TIMEOUT).get());
+        failureBreakdown.put("HTTP_403", failureCounters.get(FailureCategory.HTTP_403).get());
+        failureBreakdown.put("HTTP_404", failureCounters.get(FailureCategory.HTTP_404).get());
+        failureBreakdown.put("HTTP_429", failureCounters.get(FailureCategory.HTTP_429).get());
+        failureBreakdown.put("HTTP_5XX", failureCounters.get(FailureCategory.HTTP_5XX).get());
+        failureBreakdown.put("DNS_FAILURE", failureCounters.get(FailureCategory.DNS_FAILURE).get());
+        failureBreakdown.put("TLS_CERTIFICATE_FAILURE", failureCounters.get(FailureCategory.TLS_CERTIFICATE_FAILURE).get());
+        failureBreakdown.put("TLS_HOSTNAME_FAILURE", failureCounters.get(FailureCategory.TLS_HOSTNAME_FAILURE).get());
+        failureBreakdown.put("INVALID_URL", failureCounters.get(FailureCategory.INVALID_URL).get());
+        failureBreakdown.put("OTHER_FAILURE", failureCounters.get(FailureCategory.OTHER_FAILURE).get());
+
+        log.info("[SYNC COMPLETE] Checked: {}, Unchanged: {}, PendingReview: {}, Failed: {}, Skipped: {}, Breakdown: {}",
+                checkedCount, unchangedCount, pendingReviewCount, failedCount, skippedCount, failureBreakdown);
 
         Map<String, Object> summary = new HashMap<>();
         summary.put("checkedCount", checkedCount);
@@ -373,6 +527,7 @@ public class ScholarshipSyncService {
         summary.put("failedCount", failedCount);
         summary.put("skippedCount", skippedCount);
         summary.put("newSchemesQueued", newSchemesQueued);
+        summary.put("failureBreakdown", failureBreakdown);
         summary.put("stagedReviewIds", stagedReviewIds);
         summary.put("syncedAt", OffsetDateTime.now());
         return summary;
@@ -389,9 +544,6 @@ public class ScholarshipSyncService {
         }
     }
 
-    /**
-     * Approves and safely applies a staged scholarship update.
-     */
     @Transactional
     public boolean approveReview(UUID reviewId, String reviewer) {
         Optional<ScholarshipUpdateReview> opt = reviewRepository.findById(reviewId);
@@ -408,7 +560,6 @@ public class ScholarshipSyncService {
                 if (proposed.containsKey("officialWebsiteUrl")) sch.setOfficialWebsiteUrl((String) proposed.get("officialWebsiteUrl"));
                 if (proposed.containsKey("description")) sch.setDescription((String) proposed.get("description"));
 
-                // Recompute content hash with new approved values
                 sch.setContentHash(calculateScholarshipContentHash(sch));
                 sch.setLastVerifiedAt(OffsetDateTime.now());
                 scholarshipRepository.save(sch);

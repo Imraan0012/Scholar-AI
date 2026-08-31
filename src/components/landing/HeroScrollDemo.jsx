@@ -166,7 +166,7 @@ function ScholarshipDashboardGrid() {
   const [activeFilter, setActiveFilter] = useState("ALL");
 
   const categories = [
-    { id: "ALL", label: "All Grants (12,500+)" },
+    { id: "ALL", label: "All Verified Grants" },
     { id: "Central Govt", label: "Central Schemes (NSP)" },
     { id: "Corporate CSR", label: "Corporate & Trusts" },
     { id: "STEM Girls", label: "Girls in STEM" },
@@ -196,7 +196,7 @@ function ScholarshipDashboardGrid() {
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shadow-sm">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                12,500+ Active
+                Verified Active
               </span>
             </div>
             <p className="text-[11px] text-gray-400">

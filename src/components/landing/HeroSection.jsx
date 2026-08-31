@@ -10,7 +10,7 @@ import MagneticButton from '../ui/MagneticButton';
 export default function HeroSection({ currentUser, onCheckEligibilityClick, onAuthClick }) {
   const eligibleWords = [
     "You're Actually Eligible For",
-    "Across 12,500+ Indian Grants",
+    "Across Verified Indian Grants",
     "Matched To Your Income & State",
     "Tailored To Your Social Category"
   ];
@@ -55,9 +55,9 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         >
           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
           <span className="text-emerald-400 font-bold">
-            <CounterNumber value={12500} suffix="+" duration={1.5} />
+            100% Official
           </span>
-          <span className="text-gray-300">Active Government & Private Indian Scholarships</span>
+          <span className="text-gray-300">Verified Government & Private Indian Scholarships</span>
         </motion.div>
 
         {/* Main Headline with FlipWords */}
@@ -128,9 +128,9 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
             className="bg-[#0e101c]/80 rounded-xl p-3.5 sm:p-4 border border-white/10 text-center flex flex-col items-center shadow-lg hover:border-indigo-500/40 transition-colors"
           >
             <span className="text-lg sm:text-xl font-black text-white">
-              <CounterNumber value={12500} suffix="+" duration={2} />
+              <CounterNumber value={46} suffix="+" duration={2} />
             </span>
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">Verified Indian Scholarships</span>
+            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">Verified Active Scholarships</span>
           </TiltCard>
 
           <TiltCard
