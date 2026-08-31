@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scholarai.backend.connector.ScholarshipSourceConnector;
 import com.scholarai.backend.entity.Scholarship;
 import com.scholarai.backend.entity.ScholarshipDiscoveryCandidate;
-import com.scholarai.backend.entity.ScholarshipSource;
 import com.scholarai.backend.repository.ScholarshipDiscoveryCandidateRepository;
 import com.scholarai.backend.repository.ScholarshipRepository;
 import com.scholarai.backend.repository.ScholarshipSourceRepository;
@@ -29,13 +28,14 @@ public class ScholarshipDiscoveryService {
     private final ScholarshipSyncService syncService;
     private final ObjectMapper objectMapper;
 
-    public ScholarshipDiscoveryService(List<ScholarshipSourceConnector> connectors,
-                                       ScholarshipDiscoveryCandidateRepository candidateRepository,
-                                       ScholarshipRepository scholarshipRepository,
-                                       ScholarshipSourceRepository sourceRepository,
-                                       ScholarshipSyncService syncService,
-                                       ObjectMapper objectMapper) {
-        this.connectors = connectors;
+    public ScholarshipDiscoveryService(
+            List<ScholarshipSourceConnector> connectors,
+            ScholarshipDiscoveryCandidateRepository candidateRepository,
+            ScholarshipRepository scholarshipRepository,
+            ScholarshipSourceRepository sourceRepository,
+            ScholarshipSyncService syncService,
+            ObjectMapper objectMapper) {
+        this.connectors = connectors != null ? connectors : Collections.emptyList();
         this.candidateRepository = candidateRepository;
         this.scholarshipRepository = scholarshipRepository;
         this.sourceRepository = sourceRepository;
@@ -48,102 +48,163 @@ public class ScholarshipDiscoveryService {
      */
     @Transactional
     public Map<String, Object> runDiscoveryPipeline() {
+        // Step 1: Ensure any existing legacy duplicates in staging are marked as DUPLICATE
+        cleanAndMarkExistingDuplicates();
+
         int sourcesConfigured = connectors.size();
-        int sourcesChecked = 0;
-        int candidatesDiscovered = 0;
+        int sourcesAttempted = 0;
+        int sourcesSuccessful = 0;
+        int sourcesFailed = 0;
+        int rawCandidatesDiscovered = 0;
         int duplicatesDetected = 0;
         int newCandidates = 0;
         List<String> stagedCandidateIds = new ArrayList<>();
+        List<Map<String, Object>> perSourceMetrics = new ArrayList<>();
 
         log.info("[DISCOVERY START] Initializing All-India scholarship discovery scan.");
         log.info("[SOURCE REGISTRY LOAD] Loaded {} registered source connectors.", sourcesConfigured);
         log.info("[SOURCE COUNT] Connectors to process: {}", sourcesConfigured);
 
         for (ScholarshipSourceConnector connector : connectors) {
-            sourcesChecked++;
+            sourcesAttempted++;
             String sourceId = connector.getSourceId();
             String sourceName = connector.getSourceName();
             log.info("[DISCOVERY FETCH] Querying source: {} ({})", sourceName, sourceId);
+
+            int srcRaw = 0;
+            int srcDuplicates = 0;
+            int srcNew = 0;
+            String failureCategory = null;
 
             try {
                 List<Map<String, Object>> discoveredSchemes = connector.discoverSchemes();
                 log.info("[DISCOVERY FETCH] Source {} returned {} candidate scheme(s).", sourceId, discoveredSchemes != null ? discoveredSchemes.size() : 0);
 
-                if (discoveredSchemes == null || discoveredSchemes.isEmpty()) {
-                    continue;
-                }
+                if (discoveredSchemes != null && !discoveredSchemes.isEmpty()) {
+                    for (Map<String, Object> scheme : discoveredSchemes) {
+                        rawCandidatesDiscovered++;
+                        srcRaw++;
+                        String schemeId = (String) scheme.get("id");
+                        String schemeName = (String) scheme.get("name");
 
-                for (Map<String, Object> scheme : discoveredSchemes) {
-                    candidatesDiscovered++;
-                    String schemeId = (String) scheme.get("id");
-                    String schemeName = (String) scheme.get("name");
+                        log.debug("[NORMALIZATION] Normalizing scheme: {} ({})", schemeName, schemeId);
+                        String contentHash = syncService.calculateContentHash(scheme);
 
-                    log.debug("[NORMALIZATION] Normalizing scheme: {} ({})", schemeName, schemeId);
-                    String contentHash = syncService.calculateContentHash(scheme);
+                        // 1. Multi-signal check if already exists in live scholarship database
+                        Optional<Scholarship> duplicateMatch = findDuplicateScholarship(schemeId, schemeName,
+                                (String) scheme.get("official_scheme_id"),
+                                (String) scheme.get("provider"),
+                                (String) scheme.get("official_website_url"));
 
-                    // 1. Multi-signal check if already exists in live scholarship database
-                    Optional<Scholarship> duplicateMatch = findDuplicateScholarship(schemeId, schemeName,
-                            (String) scheme.get("official_scheme_id"),
-                            (String) scheme.get("provider"),
-                            (String) scheme.get("official_website_url"));
+                        if (duplicateMatch.isPresent()) {
+                            duplicatesDetected++;
+                            srcDuplicates++;
+                            log.info("[DEDUPLICATION] Scheme matches existing live scholarship {}: {} (incoming: {})",
+                                    duplicateMatch.get().getId(), duplicateMatch.get().getName(), schemeName);
+                            continue;
+                        }
 
-                    if (duplicateMatch.isPresent()) {
-                        duplicatesDetected++;
-                        log.info("[DEDUPLICATION] Scheme matches existing live scholarship {}: {} (incoming: {})",
-                                duplicateMatch.get().getId(), duplicateMatch.get().getName(), schemeName);
-                        continue;
+                        // 2. Check if already staged in discovery candidate review queue
+                        Optional<ScholarshipDiscoveryCandidate> existingCandidate = candidateRepository.findByContentHash(contentHash);
+                        if (existingCandidate.isPresent()) {
+                            duplicatesDetected++;
+                            srcDuplicates++;
+                            log.info("[DEDUPLICATION] Scheme already staged in review queue with hash {}: {}", contentHash, schemeName);
+                            continue;
+                        }
+
+                        // 3. Stage genuinely new scheme for review
+                        log.info("[CANDIDATE PERSIST] Staging new scheme candidate for review: {} ({})", schemeName, schemeId);
+                        ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
+                        candidate.setSourceId(sourceId);
+                        candidate.setExternalSchemeId((String) scheme.getOrDefault("official_scheme_id", schemeId));
+                        candidate.setCandidateName(schemeName);
+                        candidate.setProvider((String) scheme.getOrDefault("provider", "Official Provider"));
+                        candidate.setState((String) scheme.getOrDefault("state", "ALL_INDIA"));
+                        candidate.setGovernmentLevel((String) scheme.getOrDefault("government_level", "CENTRAL"));
+                        candidate.setAmountDisplay((String) scheme.getOrDefault("amount_display", "As per guidelines"));
+                        candidate.setSourceUrl((String) scheme.getOrDefault("official_website_url", connector.getPortalUrl()));
+                        candidate.setCandidatePayload(objectMapper.writeValueAsString(scheme));
+                        candidate.setContentHash(contentHash);
+                        candidate.setConfidenceScore(0.98);
+                        candidate.setStatus("PENDING_REVIEW");
+                        candidate.setCreatedAt(OffsetDateTime.now());
+
+                        ScholarshipDiscoveryCandidate saved = candidateRepository.save(candidate);
+                        stagedCandidateIds.add(saved.getId().toString());
+                        newCandidates++;
+                        srcNew++;
+                        log.info("[CANDIDATE PERSIST OK] Successfully staged candidate: {} (UUID: {})", schemeName, saved.getId());
                     }
-
-                    // 2. Check if already staged in discovery candidate review queue
-                    Optional<ScholarshipDiscoveryCandidate> existingCandidate = candidateRepository.findByContentHash(contentHash);
-                    if (existingCandidate.isPresent()) {
-                        duplicatesDetected++;
-                        log.info("[DEDUPLICATION] Scheme already staged in review queue with hash {}: {}", contentHash, schemeName);
-                        continue;
-                    }
-
-                    // 3. Stage genuinely new scheme for review
-                    log.info("[CANDIDATE PERSIST] Staging new scheme candidate for review: {} ({})", schemeName, schemeId);
-                    ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
-                    candidate.setSourceId(sourceId);
-                    candidate.setExternalSchemeId((String) scheme.getOrDefault("official_scheme_id", schemeId));
-                    candidate.setCandidateName(schemeName);
-                    candidate.setProvider((String) scheme.getOrDefault("provider", "Official Provider"));
-                    candidate.setState((String) scheme.getOrDefault("state", "ALL_INDIA"));
-                    candidate.setGovernmentLevel((String) scheme.getOrDefault("government_level", "CENTRAL"));
-                    candidate.setAmountDisplay((String) scheme.getOrDefault("amount_display", "As per guidelines"));
-                    candidate.setSourceUrl((String) scheme.getOrDefault("official_website_url", connector.getPortalUrl()));
-                    candidate.setCandidatePayload(objectMapper.writeValueAsString(scheme));
-                    candidate.setContentHash(contentHash);
-                    candidate.setConfidenceScore(0.98);
-                    candidate.setStatus("PENDING_REVIEW");
-                    candidate.setCreatedAt(OffsetDateTime.now());
-
-                    ScholarshipDiscoveryCandidate saved = candidateRepository.save(candidate);
-                    stagedCandidateIds.add(saved.getId().toString());
-                    newCandidates++;
-                    log.info("[CANDIDATE PERSIST OK] Successfully staged candidate: {} (UUID: {})", schemeName, saved.getId());
                 }
+                sourcesSuccessful++;
             } catch (Exception connErr) {
+                sourcesFailed++;
                 String errClass = connErr.getClass().getSimpleName();
+                failureCategory = errClass;
                 String errMsg = connErr.getMessage() != null ? connErr.getMessage() : "No message";
                 String rootCause = connErr.getCause() != null ? connErr.getCause().getClass().getSimpleName() + ": " + connErr.getCause().getMessage() : "None";
                 log.error("[DISCOVERY ERROR] Connector {} failed [{}]: {}. RootCause: {}", sourceId, errClass, errMsg, rootCause);
             }
+
+            Map<String, Object> srcMetric = new LinkedHashMap<>();
+            srcMetric.put("sourceId", sourceId);
+            srcMetric.put("sourceName", sourceName);
+            srcMetric.put("rawCandidates", srcRaw);
+            srcMetric.put("duplicates", srcDuplicates);
+            srcMetric.put("newCandidates", srcNew);
+            srcMetric.put("failureCategory", failureCategory != null ? failureCategory : "NONE");
+            perSourceMetrics.add(srcMetric);
         }
 
-        log.info("[DISCOVERY COMPLETE] SourcesChecked: {}, CandidatesDiscovered: {}, DuplicatesDetected: {}, NewCandidatesStaged: {}",
-                sourcesChecked, candidatesDiscovered, duplicatesDetected, newCandidates);
+        log.info("[DISCOVERY COMPLETE] Configured: {}, Attempted: {}, Successful: {}, Failed: {}, Raw: {}, Duplicates: {}, New: {}",
+                sourcesConfigured, sourcesAttempted, sourcesSuccessful, sourcesFailed, rawCandidatesDiscovered, duplicatesDetected, newCandidates);
 
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("sourcesConfigured", sourcesConfigured);
-        report.put("sourcesChecked", sourcesChecked);
-        report.put("candidatesDiscovered", candidatesDiscovered);
+        report.put("sourcesAttempted", sourcesAttempted);
+        report.put("sourcesSuccessful", sourcesSuccessful);
+        report.put("sourcesFailed", sourcesFailed);
+        report.put("rawCandidatesDiscovered", rawCandidatesDiscovered);
         report.put("duplicatesDetected", duplicatesDetected);
         report.put("newCandidatesStaged", newCandidates);
+        report.put("ambiguousCandidates", 0);
         report.put("stagedCandidateIds", stagedCandidateIds);
+        report.put("perSourceMetrics", perSourceMetrics);
         report.put("discoveredAt", OffsetDateTime.now());
         return report;
+    }
+
+    /**
+     * Inspects all PENDING_REVIEW candidates in the review queue and safely transitions
+     * any candidate that matches an existing live scholarship to status = "DUPLICATE".
+     */
+    @Transactional
+    public int cleanAndMarkExistingDuplicates() {
+        List<ScholarshipDiscoveryCandidate> pending = candidateRepository.findByStatus("PENDING_REVIEW");
+        int markedCount = 0;
+
+        for (ScholarshipDiscoveryCandidate candidate : pending) {
+            Optional<Scholarship> match = findDuplicateScholarship(
+                    candidate.getExternalSchemeId(),
+                    candidate.getCandidateName(),
+                    candidate.getExternalSchemeId(),
+                    candidate.getProvider(),
+                    candidate.getSourceUrl()
+            );
+
+            if (match.isPresent()) {
+                candidate.setStatus("DUPLICATE");
+                candidate.setDuplicateOf(match.get().getId());
+                candidate.setReviewedAt(OffsetDateTime.now());
+                candidate.setReviewedBy("AUTOMATED_DEDUPLICATOR");
+                candidateRepository.save(candidate);
+                markedCount++;
+                log.info("[DEDUPLICATION CLEANUP] Marked candidate '{}' as duplicate of live scholarship '{}' ({})",
+                        candidate.getCandidateName(), match.get().getName(), match.get().getId());
+            }
+        }
+        return markedCount;
     }
 
     /**
@@ -238,23 +299,6 @@ public class ScholarshipDiscoveryService {
     }
 
     /**
-     * Helper to mark a candidate as duplicate of an existing scholarship.
-     */
-    @Transactional
-    public void rejectCandidateAsDuplicate(UUID candidateId, String duplicateOfId, String reviewer) {
-        Optional<ScholarshipDiscoveryCandidate> opt = candidateRepository.findById(candidateId);
-        if (opt.isPresent()) {
-            ScholarshipDiscoveryCandidate candidate = opt.get();
-            candidate.setStatus("DUPLICATE");
-            candidate.setDuplicateOf(duplicateOfId);
-            candidate.setReviewedAt(OffsetDateTime.now());
-            candidate.setReviewedBy(reviewer != null ? reviewer : "SUPER_ADMIN");
-            candidateRepository.save(candidate);
-            log.info("[DISCOVERY REJECTED] Candidate {} marked as duplicate of {}", candidateId, duplicateOfId);
-        }
-    }
-
-    /**
      * Multi-signal duplicate detection against the existing live scholarship database.
      */
     public Optional<Scholarship> findDuplicateScholarship(String schemeId, String schemeName, String officialSchemeId, String provider, String websiteUrl) {
@@ -310,19 +354,42 @@ public class ScholarshipDiscoveryService {
         report.put("corporateCsrSources", 8);
 
         Map<String, String> stateMatrix = new LinkedHashMap<>();
-        String[] states = {
-            "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
-            "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
-            "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
-            "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
-            "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-            "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh",
-            "Andaman and Nicobar", "Dadra and Nagar Haveli", "Lakshadweep"
-        };
+        stateMatrix.put("Karnataka", "WORKING");
+        stateMatrix.put("Kerala", "WORKING");
+        stateMatrix.put("West Bengal", "WORKING");
+        stateMatrix.put("Rajasthan", "WORKING");
+        stateMatrix.put("Maharashtra", "PARTIAL");
+        stateMatrix.put("Tamil Nadu", "PARTIAL");
+        stateMatrix.put("Andhra Pradesh", "PARTIAL");
+        stateMatrix.put("Telangana", "PARTIAL");
+        stateMatrix.put("Gujarat", "PARTIAL");
+        stateMatrix.put("Madhya Pradesh", "PARTIAL");
+        stateMatrix.put("Uttar Pradesh", "PARTIAL");
+        stateMatrix.put("Bihar", "PARTIAL");
+        stateMatrix.put("Odisha", "PARTIAL");
+        stateMatrix.put("Delhi", "PARTIAL");
+        stateMatrix.put("Assam", "PARTIAL");
+        stateMatrix.put("Punjab", "PARTIAL");
+        stateMatrix.put("Haryana", "PARTIAL");
+        stateMatrix.put("Goa", "NOT_IMPLEMENTED");
+        stateMatrix.put("Chhattisgarh", "NOT_IMPLEMENTED");
+        stateMatrix.put("Himachal Pradesh", "NOT_IMPLEMENTED");
+        stateMatrix.put("Jharkhand", "NOT_IMPLEMENTED");
+        stateMatrix.put("Manipur", "NOT_IMPLEMENTED");
+        stateMatrix.put("Meghalaya", "NOT_IMPLEMENTED");
+        stateMatrix.put("Mizoram", "NOT_IMPLEMENTED");
+        stateMatrix.put("Nagaland", "NOT_IMPLEMENTED");
+        stateMatrix.put("Sikkim", "NOT_IMPLEMENTED");
+        stateMatrix.put("Tripura", "NOT_IMPLEMENTED");
+        stateMatrix.put("Uttarakhand", "NOT_IMPLEMENTED");
+        stateMatrix.put("Jammu and Kashmir", "NOT_IMPLEMENTED");
+        stateMatrix.put("Ladakh", "NOT_IMPLEMENTED");
+        stateMatrix.put("Puducherry", "NOT_IMPLEMENTED");
+        stateMatrix.put("Chandigarh", "NOT_IMPLEMENTED");
+        stateMatrix.put("Andaman and Nicobar", "NOT_IMPLEMENTED");
+        stateMatrix.put("Dadra and Nagar Haveli", "NOT_IMPLEMENTED");
+        stateMatrix.put("Lakshadweep", "NOT_IMPLEMENTED");
 
-        for (String state : states) {
-            stateMatrix.put(state, "ACTIVE_DBT_PORTAL_MAPPED");
-        }
         report.put("stateCoverageMatrix", stateMatrix);
         report.put("totalPublishedScholarships", scholarshipRepository.count());
         report.put("pendingDiscoveryCandidates", candidateRepository.countByStatus("PENDING_REVIEW"));

@@ -1,9 +1,7 @@
 package com.scholarai.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.scholarai.backend.connector.CentralNspConnector;
-import com.scholarai.backend.connector.ScholarshipSourceConnector;
-import com.scholarai.backend.connector.UgcAicteConnector;
+import com.scholarai.backend.connector.*;
 import com.scholarai.backend.entity.Scholarship;
 import com.scholarai.backend.entity.ScholarshipDiscoveryCandidate;
 import com.scholarai.backend.repository.ScholarshipDiscoveryCandidateRepository;
@@ -36,15 +34,20 @@ class ScholarshipDiscoveryServiceTest {
         com.scholarai.backend.repository.ScholarshipUpdateReviewRepository reviewRepo = mock(com.scholarai.backend.repository.ScholarshipUpdateReviewRepository.class);
         syncService = new ScholarshipSyncService(scholarshipRepository, reviewRepo, objectMapper);
 
-        List<ScholarshipSourceConnector> connectors = List.of(new CentralNspConnector(), new UgcAicteConnector());
+        List<ScholarshipSourceConnector> connectors = List.of(
+                new CentralNspConnector(),
+                new UgcAicteConnector(),
+                new StatePortalConnector(),
+                new CorporateCsrConnector()
+        );
         discoveryService = new ScholarshipDiscoveryService(
                 connectors, candidateRepository, scholarshipRepository, sourceRepository, syncService, objectMapper
         );
     }
 
     @Test
-    void testDiscoveryPipelineStagesNewCandidatesAndSuppressesDuplicates() {
-        // Mock existing DB scholarship
+    void testDiscoveryPipelineStagesGenuinelyNewCandidatesAndSuppressesDuplicates() {
+        // Mock existing DB scholarship (e.g. 1 existing match)
         Scholarship existing = new Scholarship();
         existing.setId("nsp-pm-usp-csss");
         existing.setName("PM-USP Central Sector Scheme of Scholarships for College and University Students");
@@ -54,18 +57,52 @@ class ScholarshipDiscoveryServiceTest {
         // Mock candidate save
         when(candidateRepository.save(any(ScholarshipDiscoveryCandidate.class))).thenAnswer(i -> {
             ScholarshipDiscoveryCandidate c = i.getArgument(0);
-            c.setId(UUID.randomUUID());
+            if (c.getId() == null) c.setId(UUID.randomUUID());
             return c;
         });
 
         Map<String, Object> report = discoveryService.runDiscoveryPipeline();
 
         assertNotNull(report);
-        assertEquals(2, report.get("sourcesConfigured"));
-        assertTrue((int) report.get("candidatesDiscovered") >= 5);
-        assertTrue((int) report.get("duplicatesDetected") >= 1);
+        assertEquals(4, report.get("sourcesConfigured"));
+        assertEquals(4, report.get("sourcesAttempted"));
+        assertEquals(4, report.get("sourcesSuccessful"));
+        assertEquals(0, report.get("sourcesFailed"));
+
+        int raw = (int) report.get("rawCandidatesDiscovered");
+        int staged = (int) report.get("newCandidatesStaged");
+        assertTrue(raw >= 10, "Should discover at least 10 candidates across 4 connectors");
+        assertTrue(staged >= 5, "Should stage multiple genuinely new candidates");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> metrics = (List<Map<String, Object>>) report.get("perSourceMetrics");
+        assertNotNull(metrics);
+        assertEquals(4, metrics.size());
+        assertEquals("src-central-nsp", metrics.get(0).get("sourceId"));
 
         verify(candidateRepository, atLeastOnce()).save(any(ScholarshipDiscoveryCandidate.class));
+    }
+
+    @Test
+    void testCleanAndMarkExistingDuplicates() {
+        ScholarshipDiscoveryCandidate dupCandidate = new ScholarshipDiscoveryCandidate();
+        dupCandidate.setId(UUID.randomUUID());
+        dupCandidate.setCandidateName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+        dupCandidate.setProvider("AICTE");
+        dupCandidate.setStatus("PENDING_REVIEW");
+
+        Scholarship live = new Scholarship();
+        live.setId("aicte-pragati-degree");
+        live.setName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+
+        when(candidateRepository.findByStatus("PENDING_REVIEW")).thenReturn(List.of(dupCandidate));
+        when(scholarshipRepository.findAll()).thenReturn(List.of(live));
+        when(candidateRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        int marked = discoveryService.cleanAndMarkExistingDuplicates();
+        assertEquals(1, marked);
+        assertEquals("DUPLICATE", dupCandidate.getStatus());
+        assertEquals("aicte-pragati-degree", dupCandidate.getDuplicateOf());
     }
 
     @Test
@@ -138,16 +175,17 @@ class ScholarshipDiscoveryServiceTest {
     }
 
     @Test
-    void testCoverageReportContainsAllStates() {
+    void testCoverageReportContainsEvidenceBasedMatrix() {
         Map<String, Object> report = discoveryService.getCoverageReport();
         assertNotNull(report);
         assertEquals(61, report.get("totalSourcesConfigured"));
         assertTrue(report.containsKey("stateCoverageMatrix"));
         @SuppressWarnings("unchecked")
         Map<String, String> matrix = (Map<String, String>) report.get("stateCoverageMatrix");
-        assertTrue(matrix.containsKey("Maharashtra"));
-        assertTrue(matrix.containsKey("Tamil Nadu"));
-        assertTrue(matrix.containsKey("Delhi"));
-        assertTrue(matrix.containsKey("Karnataka"));
+        assertEquals("WORKING", matrix.get("Karnataka"));
+        assertEquals("WORKING", matrix.get("Kerala"));
+        assertEquals("PARTIAL", matrix.get("Maharashtra"));
+        assertEquals("PARTIAL", matrix.get("Tamil Nadu"));
+        assertEquals("NOT_IMPLEMENTED", matrix.get("Goa"));
     }
 }
