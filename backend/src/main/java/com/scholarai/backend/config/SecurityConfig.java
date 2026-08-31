@@ -49,10 +49,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/scholarships/**", "/scholarships/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/sources/**", "/sources/**").permitAll()
 
-                        // Sync Scheduler Endpoints (Protected via X-Scheduler-Secret header)
-                        .requestMatchers("/api/admin/sync/**").permitAll()
+                        // Sync & Discovery Scheduler Endpoints (Protected via X-Scheduler-Secret header)
+                        .requestMatchers("/api/admin/sync/**", "/api/admin/discovery/**").permitAll()
 
-                        // Admin Endpoints
+                        // Other Admin Endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         // Authenticated Student Protected Endpoints

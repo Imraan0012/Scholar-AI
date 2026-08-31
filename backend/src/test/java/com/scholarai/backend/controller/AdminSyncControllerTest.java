@@ -15,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,31 +50,58 @@ class AdminSyncControllerTest {
     }
 
     @Test
-    void testMissingSecretReturnsUnauthorized() {
+    void testMissingSecretReturnsForbidden() {
         ResponseEntity<ApiResponse<Map<String, Object>>> response =
                 controller.runScholarshipSync(null, Collections.emptyList());
 
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertEquals(false, response.getBody().isSuccess());
         verifyNoInteractions(scholarshipRepository);
     }
 
     @Test
-    void testEmptySecretReturnsUnauthorized() {
+    void testEmptySecretReturnsForbidden() {
         ResponseEntity<ApiResponse<Map<String, Object>>> response =
                 controller.runScholarshipSync("   ", Collections.emptyList());
 
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         verifyNoInteractions(scholarshipRepository);
     }
 
     @Test
-    void testWrongSecretReturnsUnauthorized() {
+    void testWrongSecretReturnsForbidden() {
         ResponseEntity<ApiResponse<Map<String, Object>>> response =
                 controller.runScholarshipSync("wrong-secret-token", Collections.emptyList());
 
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         verifyNoInteractions(scholarshipRepository);
+    }
+
+    @Test
+    void testDiscoveryMissingSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.runDiscovery(null);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verifyNoInteractions(candidateRepository);
+    }
+
+    @Test
+    void testDiscoveryWrongSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.runDiscovery("wrong-token-12345");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verifyNoInteractions(candidateRepository);
+    }
+
+    @Test
+    void testDiscoveryCorrectSecretSucceeds() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.runDiscovery(CONFIGURED_SECRET);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(true, response.getBody().isSuccess());
     }
 
     @Test
@@ -97,7 +123,7 @@ class AdminSyncControllerTest {
         ResponseEntity<ApiResponse<Map<String, Object>>> response =
                 controller.runScholarshipSync(CONFIGURED_SECRET, Collections.emptyList());
 
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         verifyNoInteractions(scholarshipRepository);
     }
 }

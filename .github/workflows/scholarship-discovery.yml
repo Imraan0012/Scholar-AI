@@ -27,7 +27,7 @@ jobs:
           SUCCESS=0
 
           if [ -z "$SCHEDULER_SECRET" ]; then
-            echo "::error::SCHEDULER_SECRET is not set in repository secrets."
+            echo "::error::SCHEDULER_SECRET repository secret is not configured."
             exit 1
           fi
 
