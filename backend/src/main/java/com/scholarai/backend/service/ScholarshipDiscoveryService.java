@@ -318,13 +318,26 @@ public class ScholarshipDiscoveryService {
                 return Optional.of(existing);
             }
 
-            // Signal 3: Normalized name similarity match
+            // Signal 3: Exact scheme-specific URL match (exclude generic root domains)
+            if (isSchemeSpecificUrl(websiteUrl) && isSchemeSpecificUrl(existing.getOfficialWebsiteUrl())) {
+                if (websiteUrl.equalsIgnoreCase(existing.getOfficialWebsiteUrl()) ||
+                    websiteUrl.equalsIgnoreCase(existing.getOfficialApplicationUrl())) {
+                    return Optional.of(existing);
+                }
+            }
+
+            // Signal 4: Normalized name similarity match
             String existingNormalizedName = normalizeSchemeName(existing.getName());
             if (!normalizedIncomingName.isEmpty() && !existingNormalizedName.isEmpty()) {
-                if (normalizedIncomingName.equals(existingNormalizedName) ||
-                    normalizedIncomingName.contains(existingNormalizedName) ||
-                    existingNormalizedName.contains(normalizedIncomingName)) {
+                if (normalizedIncomingName.equals(existingNormalizedName)) {
                     return Optional.of(existing);
+                }
+                // Substring containment only if both strings are substantial (> 10 chars)
+                if (normalizedIncomingName.length() >= 10 && existingNormalizedName.length() >= 10) {
+                    if (normalizedIncomingName.contains(existingNormalizedName) ||
+                        existingNormalizedName.contains(normalizedIncomingName)) {
+                        return Optional.of(existing);
+                    }
                 }
             }
         }
@@ -332,10 +345,26 @@ public class ScholarshipDiscoveryService {
         return Optional.empty();
     }
 
+    private static boolean isSchemeSpecificUrl(String url) {
+        if (url == null || url.isBlank()) return false;
+        String clean = url.trim().toLowerCase().replaceAll("^https?://", "").replaceAll("/+$", "");
+        // Generic homepages/root portals should not establish duplicate identity alone
+        if (clean.equals("www.ugc.gov.in") || clean.equals("ugc.gov.in") ||
+            clean.equals("www.aicte-india.org") || clean.equals("aicte-india.org") ||
+            clean.equals("scholarships.gov.in") || clean.equals("www.scholarships.gov.in") ||
+            clean.equals("minorityaffairs.gov.in") || clean.equals("disabilityaffairs.gov.in") ||
+            clean.equals("dbtbharat.gov.in") || clean.equals("ssp.postmatric.karnataka.gov.in") ||
+            clean.equals("mahadbt.maharashtra.gov.in") || clean.equals("scholarship.up.gov.in") ||
+            clean.equals("sje.rajasthan.gov.in") || clean.equals("svmcm.wbhed.gov.in")) {
+            return false;
+        }
+        return clean.contains("/");
+    }
+
     public static String normalizeSchemeName(String name) {
         if (name == null) return "";
         return name.toLowerCase()
-                .replaceAll("(?i)\\b(centrally|sponsored|scheme|scholarship|scholarships|yojna|yojana|for|students|of|and|the|in)\\b", "")
+                .replaceAll("(?i)\\b(centrally|sponsored|scheme|scholarship|scholarships|yojna|yojana|for|students|of|and|the|in|programme|program)\\b", "")
                 .replaceAll("[^a-zA-Z0-9]", "")
                 .trim();
     }

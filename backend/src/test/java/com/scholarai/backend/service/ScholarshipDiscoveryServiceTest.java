@@ -188,4 +188,146 @@ class ScholarshipDiscoveryServiceTest {
         assertEquals("PARTIAL", matrix.get("Tamil Nadu"));
         assertEquals("NOT_IMPLEMENTED", matrix.get("Goa"));
     }
+
+    @Test
+    void test1_SameUgcHomepageWithDifferentScholarshipNamesIsNotDuplicate() {
+        Scholarship existing = new Scholarship();
+        existing.setId("ugc-pg-indira-gandhi-single-girl");
+        existing.setName("Post-Graduate Indira Gandhi Scholarship for Single Girl Child");
+        existing.setOfficialWebsiteUrl("https://www.ugc.gov.in");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "ugc-rank-holders",
+                "UGC Post-Graduate Merit Scholarship for University Rank Holders",
+                null,
+                "University Grants Commission",
+                "https://www.ugc.gov.in"
+        );
+
+        assertTrue(match.isEmpty(), "Generic UGC homepage must not cause false duplicate detection");
+    }
+
+    @Test
+    void test2_SameProviderWithDifferentSchemeIsNotDuplicate() {
+        Scholarship existing = new Scholarship();
+        existing.setId("aicte-pragati-degree");
+        existing.setName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+        existing.setProvider("AICTE");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "aicte-swanath-scholarship",
+                "AICTE Swanath Scholarship Scheme for Orphans",
+                null,
+                "AICTE",
+                "https://www.aicte-india.org"
+        );
+
+        assertTrue(match.isEmpty(), "Different schemes from same provider must not be marked duplicate");
+    }
+
+    @Test
+    void test3_SameOfficialSchemeIdIsDefinitiveDuplicate() {
+        Scholarship existing = new Scholarship();
+        existing.setId("mota-st-fellowship");
+        existing.setName("National Fellowship for ST Students");
+        existing.setOfficialSchemeId("NSP_MOTA_ST_2026");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "new-incoming-st",
+                "ST Higher Education Scholarship Program",
+                "NSP_MOTA_ST_2026",
+                "Ministry of Tribal Affairs",
+                "https://tribal.nic.in"
+        );
+
+        assertTrue(match.isPresent(), "Matching official_scheme_id must be detected as duplicate");
+        assertEquals("mota-st-fellowship", match.get().getId());
+    }
+
+    @Test
+    void test4_SameNormalizedSchemeNameAndProviderIsDuplicate() {
+        Scholarship existing = new Scholarship();
+        existing.setId("wipro-santoor-womens-scholarship");
+        existing.setName("Santoor Women’s Scholarship for Higher Education");
+        existing.setProvider("Wipro Consumer Care and Wipro Cares");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "santoor-grant-new",
+                "Santoor Women's Scholarship Scheme for Higher Education",
+                null,
+                "Wipro Cares",
+                "https://www.santoorwomensscholarship.com"
+        );
+
+        assertTrue(match.isPresent(), "Normalized matching scheme name must be detected as duplicate");
+        assertEquals("wipro-santoor-womens-scholarship", match.get().getId());
+    }
+
+    @Test
+    void test5_ExactSchemeSpecificUrlMatchesIdentityAsDuplicate() {
+        Scholarship existing = new Scholarship();
+        existing.setId("adobe-wit-india");
+        existing.setName("Adobe India Women-in-Technology Scholarship");
+        existing.setOfficialWebsiteUrl("https://research.adobe.com/scholarship/adobe-india-women-in-technology-scholarship/");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "adobe-candidate",
+                "Adobe India Women in Tech Award",
+                null,
+                "Adobe",
+                "https://research.adobe.com/scholarship/adobe-india-women-in-technology-scholarship/"
+        );
+
+        assertTrue(match.isPresent(), "Exact deep scheme-specific URL must match duplicate");
+        assertEquals("adobe-wit-india", match.get().getId());
+    }
+
+    @Test
+    void test6_SlightlyDifferentSpellingOfSameSchemeIsDuplicate() {
+        Scholarship existing = new Scholarship();
+        existing.setId("mosje-post-matric-sc");
+        existing.setName("Centrally Sponsored Post-Matric Scholarship Scheme for SC Students");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "sc-postmatric-nsp",
+                "Post Matric Scholarship for SC Students (Centrally Sponsored)",
+                null,
+                "Ministry of Social Justice and Empowerment",
+                "https://socialjustice.gov.in"
+        );
+
+        assertTrue(match.isPresent(), "Word order / spelling variations of same scheme must match duplicate");
+        assertEquals("mosje-post-matric-sc", match.get().getId());
+    }
+
+    @Test
+    void test7_DifferentLegitimateSchemesFromSameMinistryAreNotDuplicate() {
+        Scholarship existing1 = new Scholarship();
+        existing1.setId("moma-post-matric");
+        existing1.setName("Post-Matric Scholarship Scheme for Minorities");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing1));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "moma-mcm-candidate",
+                "Merit-cum-Means Scholarship for Professional and Technical Courses (Minority)",
+                null,
+                "Ministry of Minority Affairs",
+                "https://minorityaffairs.gov.in"
+        );
+
+        assertTrue(match.isEmpty(), "Distinct schemes from same ministry must not be marked duplicate");
+    }
 }
