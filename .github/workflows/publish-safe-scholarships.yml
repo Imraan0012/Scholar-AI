@@ -1,0 +1,73 @@
+name: Publish Safe Discovery Candidates
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-safe-candidates:
+    name: Publish Verified Safe Scholarship Candidates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Trigger Spring Boot Publish Safe Endpoint
+        env:
+          BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-l8uc.onrender.com' }}
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
+        run: |
+          echo "Triggering publication of verified SAFE_NEW scholarship discovery candidates..."
+          ENDPOINT="${BACKEND_URL}/api/admin/discovery/publish-safe"
+          MAX_RETRIES=3
+          RETRY_DELAY=15
+          SUCCESS=0
+
+          if [ -z "$SCHEDULER_SECRET" ]; then
+            echo "::error::SCHEDULER_SECRET repository secret is not configured."
+            exit 1
+          fi
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES: Calling publish-safe endpoint..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$ENDPOINT" \
+              -H "Content-Type: application/json" \
+              -H "X-Scheduler-Secret: ${SCHEDULER_SECRET}" \
+              --max-time 60)
+
+            HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -n -e 's/^HTTP_STATUS://p')
+            BODY=$(echo "$RESPONSE" | sed -e '/HTTP_STATUS:/d')
+
+            echo "Response HTTP Status: $HTTP_STATUS"
+
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "Candidate publication completed successfully."
+              echo "================ PUBLICATION METRICS ================"
+              echo "$BODY"
+              echo "====================================================="
+              SUCCESS=1
+              break
+            elif [ "$HTTP_STATUS" -eq 401 ] || [ "$HTTP_STATUS" -eq 403 ]; then
+              echo "::error::Authentication failed with HTTP $HTTP_STATUS. Please verify SCHEDULER_SECRET."
+              echo "Response Body: $BODY"
+              exit 1
+            else
+              echo "::warning::Received HTTP $HTTP_STATUS. Render instance may be warming up or building. Waiting $RETRY_DELAY seconds..."
+              echo "Response Body: $BODY"
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "::error::Publication failed after $MAX_RETRIES attempts."
+            exit 1
+          fi
+
+      - name: Verify Live Scholarship Catalog Count
+        env:
+          BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-l8uc.onrender.com' }}
+        run: |
+          echo "Verifying public scholarship API count..."
+          CATALOG_RESPONSE=$(curl -s "${BACKEND_URL}/api/scholarships")
+          echo "Catalog API Response:"
+          echo "$CATALOG_RESPONSE" | grep -o '"totalElements":[0-9]*' || true
