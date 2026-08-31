@@ -2,7 +2,7 @@
 // SCHOLAR AI — SCHOLARSHIP SERVICE (SPRING BOOT REST INTEGRATION)
 // =============================================================================
 
-import { apiClient } from './apiClient';
+import { apiClient } from './apiClient.js';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import { MASTER_SCHOLARSHIP_REGISTRY } from '../data/scholarships/index.js';
 

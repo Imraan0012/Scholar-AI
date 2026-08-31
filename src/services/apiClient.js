@@ -4,14 +4,17 @@
 // AbortController with 12-second timeout — Render cold-start never hangs.
 // =============================================================================
 
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient.js';
 
 // How long to wait for the Render backend before aborting (ms).
 // Render free tier can take up to 30 s to wake, but we give 12 s then retry once.
 const REQUEST_TIMEOUT_MS = 12_000;
 
 export function getNormalizedApiBase() {
-  let base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').trim();
+  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
+                 (typeof process !== 'undefined' && process.env?.VITE_API_BASE_URL) ||
+                 'http://localhost:8000/api';
+  let base = envUrl.trim();
   base = base.replace(/\/+$/, ''); // Remove trailing slashes
   if (!base.endsWith('/api')) {
     base = `${base}/api`;

@@ -150,7 +150,10 @@ export const authService = {
       return { success: false, message: 'Full name is required.' };
     }
 
-    let API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').trim().replace(/\/+$/, '');
+    const envUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) ||
+                   (typeof process !== 'undefined' && process.env?.VITE_API_BASE_URL) ||
+                   'http://localhost:8000/api';
+    let API_BASE = envUrl.trim().replace(/\/+$/, '');
     if (!API_BASE.endsWith('/api')) {
       API_BASE = `${API_BASE}/api`;
     }
