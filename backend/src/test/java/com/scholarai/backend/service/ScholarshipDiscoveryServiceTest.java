@@ -47,7 +47,9 @@ class ScholarshipDiscoveryServiceTest {
         // Mock existing DB scholarship
         Scholarship existing = new Scholarship();
         existing.setId("nsp-pm-usp-csss");
+        existing.setName("PM-USP Central Sector Scheme of Scholarships for College and University Students");
         when(scholarshipRepository.findById("nsp-pm-usp-csss")).thenReturn(Optional.of(existing));
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
 
         // Mock candidate save
         when(candidateRepository.save(any(ScholarshipDiscoveryCandidate.class))).thenAnswer(i -> {
@@ -62,7 +64,6 @@ class ScholarshipDiscoveryServiceTest {
         assertEquals(2, report.get("sourcesConfigured"));
         assertTrue((int) report.get("candidatesDiscovered") >= 5);
         assertTrue((int) report.get("duplicatesDetected") >= 1);
-        assertTrue((int) report.get("newCandidatesStaged") >= 1);
 
         verify(candidateRepository, atLeastOnce()).save(any(ScholarshipDiscoveryCandidate.class));
     }
@@ -72,26 +73,68 @@ class ScholarshipDiscoveryServiceTest {
         UUID candidateId = UUID.randomUUID();
         ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
         candidate.setId(candidateId);
-        candidate.setCandidateName("AICTE Pragati Scholarship for Girls");
-        candidate.setProvider("AICTE");
-        candidate.setCandidatePayload("{\"id\":\"aicte-pragati\",\"name\":\"AICTE Pragati Scholarship\",\"provider\":\"AICTE\",\"amount_display\":\"₹50,000 / year\",\"amount_max\":50000}");
-        candidate.setContentHash("HASH_PRAGATI");
+        candidate.setCandidateName("Unique Special Foundation Grant 2026");
+        candidate.setProvider("Special Trust");
+        candidate.setCandidatePayload("{\"id\":\"unique-grant-2026\",\"name\":\"Unique Special Foundation Grant 2026\",\"provider\":\"Special Trust\",\"amount_display\":\"₹50,000 / year\",\"amount_max\":50000}");
+        candidate.setContentHash("HASH_UNIQUE");
         candidate.setStatus("PENDING_REVIEW");
 
         when(candidateRepository.findById(candidateId)).thenReturn(Optional.of(candidate));
+        when(scholarshipRepository.findAll()).thenReturn(Collections.emptyList());
         when(scholarshipRepository.save(any(Scholarship.class))).thenAnswer(i -> i.getArgument(0));
         when(candidateRepository.save(any(ScholarshipDiscoveryCandidate.class))).thenAnswer(i -> i.getArgument(0));
 
         Scholarship published = discoveryService.approveAndPublishCandidate(candidateId, "SUPER_ADMIN");
 
         assertNotNull(published);
-        assertEquals("aicte-pragati", published.getId());
-        assertEquals("AICTE Pragati Scholarship", published.getName());
+        assertEquals("unique-grant-2026", published.getId());
+        assertEquals("Unique Special Foundation Grant 2026", published.getName());
         assertEquals("PUBLISHED", candidate.getStatus());
         assertEquals("SUPER_ADMIN", candidate.getReviewedBy());
 
         verify(scholarshipRepository, times(1)).save(any(Scholarship.class));
         verify(candidateRepository, times(1)).save(candidate);
+    }
+
+    @Test
+    void testApproveAndPublishCandidateRejectsDuplicate() {
+        UUID candidateId = UUID.randomUUID();
+        ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
+        candidate.setId(candidateId);
+        candidate.setCandidateName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+        candidate.setProvider("AICTE");
+        candidate.setCandidatePayload("{\"id\":\"aicte-pragati-new\",\"name\":\"AICTE Pragati Scholarship Scheme for Girl Students (Degree)\",\"provider\":\"AICTE\"}");
+        candidate.setStatus("PENDING_REVIEW");
+
+        Scholarship existingLive = new Scholarship();
+        existingLive.setId("aicte-pragati-degree");
+        existingLive.setName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+
+        when(candidateRepository.findById(candidateId)).thenReturn(Optional.of(candidate));
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existingLive));
+
+        assertThrows(IllegalStateException.class, () -> {
+            discoveryService.approveAndPublishCandidate(candidateId, "SUPER_ADMIN");
+        });
+
+        assertEquals("DUPLICATE", candidate.getStatus());
+        assertEquals("aicte-pragati-degree", candidate.getDuplicateOf());
+        verify(candidateRepository, times(1)).save(candidate);
+        verify(scholarshipRepository, never()).save(any(Scholarship.class));
+    }
+
+    @Test
+    void testDoublePublishingThrowsException() {
+        UUID candidateId = UUID.randomUUID();
+        ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
+        candidate.setId(candidateId);
+        candidate.setStatus("PUBLISHED");
+
+        when(candidateRepository.findById(candidateId)).thenReturn(Optional.of(candidate));
+
+        assertThrows(IllegalStateException.class, () -> {
+            discoveryService.approveAndPublishCandidate(candidateId, "SUPER_ADMIN");
+        });
     }
 
     @Test

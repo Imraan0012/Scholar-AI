@@ -81,11 +81,16 @@ public class ScholarshipDiscoveryService {
                     log.debug("[NORMALIZATION] Normalizing scheme: {} ({})", schemeName, schemeId);
                     String contentHash = syncService.calculateContentHash(scheme);
 
-                    // 1. Check if already exists in live scholarship database
-                    Optional<Scholarship> existingInDb = scholarshipRepository.findById(schemeId);
-                    if (existingInDb.isPresent()) {
+                    // 1. Multi-signal check if already exists in live scholarship database
+                    Optional<Scholarship> duplicateMatch = findDuplicateScholarship(schemeId, schemeName,
+                            (String) scheme.get("official_scheme_id"),
+                            (String) scheme.get("provider"),
+                            (String) scheme.get("official_website_url"));
+
+                    if (duplicateMatch.isPresent()) {
                         duplicatesDetected++;
-                        log.info("[DEDUPLICATION] Scheme already exists in live database: {} ({})", schemeName, schemeId);
+                        log.info("[DEDUPLICATION] Scheme matches existing live scholarship {}: {} (incoming: {})",
+                                duplicateMatch.get().getId(), duplicateMatch.get().getName(), schemeName);
                         continue;
                     }
 
@@ -152,13 +157,39 @@ public class ScholarshipDiscoveryService {
         }
 
         ScholarshipDiscoveryCandidate candidate = opt.get();
+        if ("PUBLISHED".equalsIgnoreCase(candidate.getStatus())) {
+            throw new IllegalStateException("Candidate is already published: " + candidateId);
+        }
+
         try {
             Map<String, Object> payload = objectMapper.readValue(candidate.getCandidatePayload(), Map.class);
             String id = (String) payload.getOrDefault("id", "sch-disc-" + System.currentTimeMillis());
+            String name = (String) payload.getOrDefault("name", candidate.getCandidateName());
+
+            // Pre-publication safety check: verify candidate is not a duplicate of existing live scholarship
+            Optional<Scholarship> duplicateMatch = findDuplicateScholarship(
+                    id, name,
+                    candidate.getExternalSchemeId(),
+                    candidate.getProvider(),
+                    candidate.getSourceUrl()
+            );
+
+            if (duplicateMatch.isPresent()) {
+                candidate.setStatus("DUPLICATE");
+                candidate.setDuplicateOf(duplicateMatch.get().getId());
+                candidate.setReviewedAt(OffsetDateTime.now());
+                candidate.setReviewedBy(reviewer != null ? reviewer : "SUPER_ADMIN");
+                candidateRepository.save(candidate);
+
+                log.warn("[DISCOVERY REJECTED] Candidate {} is duplicate of existing scholarship {}: {}",
+                        candidateId, duplicateMatch.get().getId(), duplicateMatch.get().getName());
+                throw new IllegalStateException(String.format("Candidate '%s' is a duplicate of existing scholarship '%s' (%s)",
+                        candidate.getCandidateName(), duplicateMatch.get().getName(), duplicateMatch.get().getId()));
+            }
 
             Scholarship sch = new Scholarship();
             sch.setId(id);
-            sch.setName((String) payload.getOrDefault("name", candidate.getCandidateName()));
+            sch.setName(name);
             sch.setProvider((String) payload.getOrDefault("provider", candidate.getProvider()));
             sch.setProviderType((String) payload.getOrDefault("provider_type", "GOVERNMENT"));
             sch.setGovernmentLevel((String) payload.getOrDefault("government_level", candidate.getGovernmentLevel()));
@@ -198,10 +229,71 @@ public class ScholarshipDiscoveryService {
 
             log.info("[DISCOVERY PUBLISHED] Successfully published new scholarship to live catalog: {} ({})", saved.getName(), saved.getId());
             return saved;
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("[DISCOVERY PUBLISH ERROR] Failed to publish candidate {}: {}", candidateId, e.getMessage());
             throw new RuntimeException("Publishing failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Helper to mark a candidate as duplicate of an existing scholarship.
+     */
+    @Transactional
+    public void rejectCandidateAsDuplicate(UUID candidateId, String duplicateOfId, String reviewer) {
+        Optional<ScholarshipDiscoveryCandidate> opt = candidateRepository.findById(candidateId);
+        if (opt.isPresent()) {
+            ScholarshipDiscoveryCandidate candidate = opt.get();
+            candidate.setStatus("DUPLICATE");
+            candidate.setDuplicateOf(duplicateOfId);
+            candidate.setReviewedAt(OffsetDateTime.now());
+            candidate.setReviewedBy(reviewer != null ? reviewer : "SUPER_ADMIN");
+            candidateRepository.save(candidate);
+            log.info("[DISCOVERY REJECTED] Candidate {} marked as duplicate of {}", candidateId, duplicateOfId);
+        }
+    }
+
+    /**
+     * Multi-signal duplicate detection against the existing live scholarship database.
+     */
+    public Optional<Scholarship> findDuplicateScholarship(String schemeId, String schemeName, String officialSchemeId, String provider, String websiteUrl) {
+        // Signal 1: Exact ID match
+        if (schemeId != null && !schemeId.isBlank()) {
+            Optional<Scholarship> byId = scholarshipRepository.findById(schemeId);
+            if (byId.isPresent()) return byId;
+        }
+
+        List<Scholarship> all = scholarshipRepository.findAll();
+        String normalizedIncomingName = normalizeSchemeName(schemeName);
+
+        for (Scholarship existing : all) {
+            // Signal 2: Official Scheme ID match
+            if (officialSchemeId != null && !officialSchemeId.isBlank() &&
+                officialSchemeId.equalsIgnoreCase(existing.getOfficialSchemeId())) {
+                return Optional.of(existing);
+            }
+
+            // Signal 3: Normalized name similarity match
+            String existingNormalizedName = normalizeSchemeName(existing.getName());
+            if (!normalizedIncomingName.isEmpty() && !existingNormalizedName.isEmpty()) {
+                if (normalizedIncomingName.equals(existingNormalizedName) ||
+                    normalizedIncomingName.contains(existingNormalizedName) ||
+                    existingNormalizedName.contains(normalizedIncomingName)) {
+                    return Optional.of(existing);
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    public static String normalizeSchemeName(String name) {
+        if (name == null) return "";
+        return name.toLowerCase()
+                .replaceAll("(?i)\\b(centrally|sponsored|scheme|scholarship|scholarships|yojna|yojana|for|students|of|and|the|in)\\b", "")
+                .replaceAll("[^a-zA-Z0-9]", "")
+                .trim();
     }
 
     public List<ScholarshipDiscoveryCandidate> getPendingCandidates() {
