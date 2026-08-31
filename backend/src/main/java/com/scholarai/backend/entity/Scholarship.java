@@ -68,6 +68,15 @@ public class Scholarship {
     @Column(name = "verification_status", length = 50, nullable = false)
     private String verificationStatus = "VERIFIED";
 
+    @Column(name = "official_scheme_id", length = 100)
+    private String officialSchemeId;
+
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;
+
+    @Column(name = "last_checked_at")
+    private OffsetDateTime lastCheckedAt;
+
     @Column(name = "last_verified_at")
     private OffsetDateTime lastVerifiedAt;
 
@@ -156,6 +165,15 @@ public class Scholarship {
 
     public String getVerificationStatus() { return verificationStatus; }
     public void setVerificationStatus(String verificationStatus) { this.verificationStatus = verificationStatus; }
+
+    public String getOfficialSchemeId() { return officialSchemeId; }
+    public void setOfficialSchemeId(String officialSchemeId) { this.officialSchemeId = officialSchemeId; }
+
+    public String getContentHash() { return contentHash; }
+    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
+
+    public OffsetDateTime getLastCheckedAt() { return lastCheckedAt; }
+    public void setLastCheckedAt(OffsetDateTime lastCheckedAt) { this.lastCheckedAt = lastCheckedAt; }
 
     public OffsetDateTime getLastVerifiedAt() { return lastVerifiedAt; }
     public void setLastVerifiedAt(OffsetDateTime lastVerifiedAt) { this.lastVerifiedAt = lastVerifiedAt; }

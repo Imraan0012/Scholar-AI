@@ -149,13 +149,16 @@ export const StudentProfileProvider = ({ children }) => {
   const [savedApplications, setSavedApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
 
-  // ── Granular loading states ─────────────────────────────────────────────────
+  // ── Granular loading & status states ─────────────────────────────────────────
   // authLoading: true only while Supabase resolves the session (~200 ms).
   //   The full-screen loader in App.jsx is gated on this.
   const [authLoading, setAuthLoading] = useState(true);
   // profileLoading: true while Spring Boot /api/profile is in-flight.
   //   Never blocks the whole app — only shows skeletons inside profile sections.
   const [profileLoading, setProfileLoading] = useState(false);
+  // profileStatus: 'loading' | 'loaded' | 'not_found' | 'error'
+  //   Guarantees route guards ONLY redirect on confirmed 'not_found' in DB.
+  const [profileStatus, setProfileStatus] = useState('loading');
   // profileError: message string when backend failed/timed out; null otherwise.
   const [profileError, setProfileError] = useState(null);
 
@@ -178,6 +181,7 @@ export const StudentProfileProvider = ({ children }) => {
   const loadUserData = useCallback(async (user, { isRetry = false } = {}) => {
     if (!user?.id) {
       setProfile(createEmptyProfile(null));
+      setProfileStatus('not_found');
       setBookmarks([]);
       setSavedApplications([]);
       setNotifications([]);
@@ -185,6 +189,7 @@ export const StudentProfileProvider = ({ children }) => {
     }
 
     setProfileLoading(true);
+    setProfileStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
     if (!isRetry) setProfileError(null);
 
     try {
@@ -192,7 +197,7 @@ export const StudentProfileProvider = ({ children }) => {
       // Bookmarks / apps / notifs are lightweight Supabase calls, run in parallel.
       const [userProfile, userBookmarks, userApps, userNotifs] = await Promise.all([
         profileService.getProfile(user.id).catch((err) => {
-          // Re-throw so we can set profileError below
+          // Re-throw so we can handle 404 vs timeout / network errors below
           throw err;
         }),
         bookmarkService.getBookmarks(user.id).catch(() => []),
@@ -205,6 +210,11 @@ export const StudentProfileProvider = ({ children }) => {
       const isCompleted = firstIncomplete === 6 || Boolean(userProfile?.onboardingComplete || userProfile?.isOnboarded);
       const step = isCompleted ? 6 : firstIncomplete;
 
+      const hasValidProfile = Boolean(
+        userProfile &&
+        (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course)
+      );
+
       const cleanProfile = {
         ...empty,
         ...(userProfile || {}),
@@ -214,10 +224,11 @@ export const StudentProfileProvider = ({ children }) => {
       };
 
       setProfile(cleanProfile);
+      setProfileStatus(hasValidProfile ? 'loaded' : 'not_found');
       setProfileError(null);
 
       // Cache only harmless hint — never the full profile data
-      writeProfileHint(true, isCompleted);
+      writeProfileHint(hasValidProfile, isCompleted);
       try {
         localStorage.setItem('scholar_ai_onboarding_step', String(step));
       } catch (e) {}
@@ -227,14 +238,23 @@ export const StudentProfileProvider = ({ children }) => {
       setNotifications(Array.isArray(userNotifs) ? userNotifs : []);
     } catch (err) {
       const isTimeout = err?.isTimeout === true;
-      const msg = isTimeout
-        ? 'Server is waking up — this may take a moment.'
-        : 'Could not load your profile. Check your connection.';
+      const is404 = err?.status === 404 || err?.message?.toLowerCase().includes('not found');
 
-      console.warn('[StudentProfileContext] loadUserData error:', err.message);
-      setProfileError(msg);
+      if (is404) {
+        setProfileStatus('not_found');
+        setProfileError(null);
+      } else {
+        // Backend timeout, Render sleep, or network disconnection
+        setProfileStatus('error');
+        const msg = isTimeout
+          ? 'Server is waking up — this may take a moment.'
+          : 'Could not load your profile. Check your connection.';
+        setProfileError(msg);
+      }
+
+      console.warn('[StudentProfileContext] loadUserData notice:', err.message);
       // Do NOT sign the user out or clear their session on profile failure.
-      // Do NOT redirect to onboarding on failure.
+      // Do NOT redirect to onboarding on timeout or transient error.
     } finally {
       setProfileLoading(false);
     }
@@ -273,6 +293,7 @@ export const StudentProfileProvider = ({ children }) => {
       } else {
         setCurrentUser(null);
         setProfile(createEmptyProfile(null));
+        setProfileStatus('not_found');
         setBookmarks([]);
         setSavedApplications([]);
         setNotifications([]);
@@ -285,7 +306,7 @@ export const StudentProfileProvider = ({ children }) => {
       // IMPORTANT: Only fetch backend data when the user is authenticated.
       // Public routes (/, /signup, /login) must never contact the Render backend.
       if (user) {
-        // loadUserData manages its own profileLoading / profileError state
+        // loadUserData manages its own profileLoading / profileStatus / profileError state
         loadUserData(user);
         // Scholarships: load async for authenticated users only
         loadScholarshipsAsync();
@@ -301,12 +322,19 @@ export const StudentProfileProvider = ({ children }) => {
       // INITIAL_SESSION is handled by initSession — ignore to prevent duplicate fetch
       if (event === 'INITIAL_SESSION') return;
 
+      // TOKEN_REFRESHED or USER_UPDATED: keep existing profile intact, do NOT reset status
+      if (event === 'TOKEN_REFRESHED') {
+        if (user) setCurrentUser(user);
+        return;
+      }
+
       if (user) {
         setCurrentUser(user);
         loadUserData(user);
       } else {
         setCurrentUser(null);
         setProfile(createEmptyProfile(null));
+        setProfileStatus('not_found');
         setBookmarks([]);
         setSavedApplications([]);
         setNotifications([]);
@@ -321,6 +349,21 @@ export const StudentProfileProvider = ({ children }) => {
       unsubscribeAuth();
     };
   }, [loadUserData, loadScholarshipsAsync]);
+
+  // ── Real-time scholarship & sources subscription ───────────────────────────
+  useEffect(() => {
+    const unsubscribeScholarships = scholarshipService.subscribeToScholarshipChanges?.((payload) => {
+      console.log('[StudentProfileContext] Realtime scholarship update received:', payload?.eventType);
+      // Refresh scholarships asynchronously to reflect newly approved changes live
+      loadScholarshipsAsync();
+    });
+
+    return () => {
+      if (typeof unsubscribeScholarships === 'function') {
+        unsubscribeScholarships();
+      }
+    };
+  }, [loadScholarshipsAsync]);
 
   // ── Real-time notifications subscription ────────────────────────────────────
   useEffect(() => {
@@ -370,6 +413,7 @@ export const StudentProfileProvider = ({ children }) => {
 
   // ── Profile mutation ──────────────────────────────────────────────────────────
   const updateProfile = useCallback((updates) => {
+    setProfileStatus('loaded');
     setProfile(prev => {
       const merged = { ...prev, ...updates };
       return merged;
@@ -548,9 +592,10 @@ export const StudentProfileProvider = ({ children }) => {
         updatePassword,
         recalculateBackendEligibility,
         retryProfile,
-        // Granular loading states
+        // Granular loading & status states
         authLoading,
         profileLoading,
+        profileStatus,
         profileError,
         // Backwards-compat alias (authLoading only — never profile)
         loading,

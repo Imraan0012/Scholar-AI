@@ -63,6 +63,8 @@ function MainAppContent() {
     authLoading,
     // profileLoading: true while Spring Boot /api/profile is in-flight
     profileLoading,
+    // profileStatus: 'loading' | 'loaded' | 'not_found' | 'error'
+    profileStatus,
     // profileError: set when backend times out or fails
     profileError,
     retryProfile,
@@ -137,8 +139,8 @@ function MainAppContent() {
   }, []);
 
   // Route protection & Centralized Onboarding Guard.
-  // IMPORTANT: Do NOT redirect while profileLoading — this prevents falsely sending
-  // logged-in users to onboarding before their profile has loaded from the backend.
+  // Strictly redirect to onboarding ONLY when profileStatus === 'not_found'.
+  // Do NOT redirect during loading, error, Render cold-start, token refresh, or realtime disconnection.
   useEffect(() => {
     // Wait until auth resolves before making routing decisions
     if (authLoading) return;
@@ -156,21 +158,18 @@ function MainAppContent() {
       return;
     }
 
-    // 2. Only redirect to onboarding once profile has fully loaded.
-    //    While profileLoading is true we have no reliable onboarding status — skip.
-    if (currentUser && !profileLoading) {
-      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
+    // 2. Only redirect to onboarding when profile is confirmed not found in database.
+    if (currentUser && profileStatus === 'not_found') {
       const requiresCompletedOnboarding = ['dashboard', 'results', 'analysis'].includes(view);
-      if (requiresCompletedOnboarding && !isCompleted && !profileError) {
-        // Only redirect if profile actually loaded (no error) and is genuinely incomplete
-        console.log('[OnboardingGuard] Incomplete profile blocked from', view, '-> Redirecting to /onboarding');
+      if (requiresCompletedOnboarding) {
+        console.log('[OnboardingGuard] Profile not found in database for', view, '-> Redirecting to /onboarding');
         setView('onboarding');
         if (window.location.pathname !== '/onboarding') {
           window.history.replaceState(null, '', '/onboarding');
         }
       }
     }
-  }, [view, currentUser, authLoading, profileLoading, profileError, profile?.onboardingComplete, profile?.isOnboarded]);
+  }, [view, currentUser, authLoading, profileStatus]);
 
   const handleOpenAuth = (mode = 'signin') => {
     setAuthMode(mode);
@@ -201,25 +200,9 @@ function MainAppContent() {
       return;
     }
 
-    // SIGN IN FLOW: Navigate immediately — profile is loading in the background.
-    // Use whatever profile data is already available (may be null on cold backend).
-    const userProfile = authData?.profile || profile;
-    const firstIncomplete = profileService_getFirstIncompleteStep(userProfile);
-    const isComplete = firstIncomplete === 6 || Boolean(
-      authData?.onboardingComplete ||
-      authData?.profile?.onboardingComplete ||
-      authData?.profile?.isOnboarded ||
-      profile?.onboardingComplete ||
-      profile?.isOnboarded
-    );
-
-    if (isComplete) {
-      navigateToView('dashboard');
-    } else {
-      // If we don't know yet (profile still loading), go to dashboard
-      // The onboarding guard will redirect if truly needed once profile loads
-      navigateToView('dashboard');
-    }
+    // SIGN IN FLOW: Navigate immediately to dashboard.
+    // The onboarding guard will only redirect if database confirms profile is not_found.
+    navigateToView('dashboard');
   };
 
   const handleLogout = async () => {
@@ -232,12 +215,7 @@ function MainAppContent() {
       handleOpenAuth('signup');
       return;
     }
-    const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
-    if (isCompleted) {
-      navigateToView('dashboard');
-    } else {
-      navigateToView('onboarding');
-    }
+    navigateToView(profileStatus === 'not_found' ? 'onboarding' : 'dashboard');
   };
 
   const handleNavClick = (href) => {
@@ -277,13 +255,12 @@ function MainAppContent() {
   // Auth is resolved — render the application.
   const isProtected = ['dashboard', 'onboarding', 'analysis', 'results', 'admin'].includes(view);
   const requiresOnboarding = ['dashboard', 'results'].includes(view);
-  const isOnboarded = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
 
   // Strictly sanitize view rendering so unauthenticated users never see unpermitted views.
-  // While profile is still loading we allow dashboard to render (shows skeleton inside).
+  // Only redirect to onboarding when confirmed not_found in DB.
   const activeView = (!currentUser && isProtected)
     ? 'landing'
-    : (currentUser && requiresOnboarding && !isOnboarded && !profileLoading && !profileError)
+    : (currentUser && requiresOnboarding && profileStatus === 'not_found')
       ? 'onboarding'
       : view;
 
@@ -321,8 +298,7 @@ function MainAppContent() {
           onCheckEligibilityClick={handleStartCheckEligibility}
           onNavClick={handleNavClick}
           onGoToDashboard={() => {
-            const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
-            navigateToView(isCompleted ? 'dashboard' : 'onboarding');
+            navigateToView(profileStatus === 'not_found' ? 'onboarding' : 'dashboard');
           }}
           onLogout={handleLogout}
         />

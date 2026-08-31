@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { apiClient } from './apiClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient.js';
 import { MASTER_SCHOLARSHIP_REGISTRY } from '../data/scholarships/index.js';
 
 function parseJsonValue(val) {
@@ -159,6 +160,24 @@ export const scholarshipService = {
       return data?.count || MASTER_SCHOLARSHIP_REGISTRY.length;
     } catch (err) {
       return MASTER_SCHOLARSHIP_REGISTRY.length;
+    }
+  },
+
+  /**
+   * Listens to real-time changes on the scholarships table via Supabase Realtime.
+   */
+  subscribeToScholarshipChanges(onChange) {
+    if (!isSupabaseConfigured || typeof onChange !== 'function') {
+      return () => {};
+    }
+    try {
+      const channel = supabase
+        .channel('public:scholarships_realtime_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'scholarships' }, onChange)
+        .subscribe();
+      return () => supabase.removeChannel(channel);
+    } catch (err) {
+      return () => {};
     }
   }
 };

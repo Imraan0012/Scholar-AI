@@ -1,0 +1,38 @@
+name: Automated Scholarship Source Synchronization
+
+on:
+  schedule:
+    # Runs every 12 hours (00:00 and 12:00 UTC)
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-scholarships:
+    name: Check Official Sources & Sync Scholarships
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Trigger Spring Boot Sync Endpoint
+        env:
+          BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-backend.onrender.com' }}
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET || 'scholar-ai-sync-2026' }}
+        run: |
+          echo "Triggering 12-hour official scholarship sync pipeline..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "${BACKEND_URL}/api/admin/sync/scholarships" \
+            -H "Content-Type: application/json" \
+            -H "X-Scheduler-Secret: ${SCHEDULER_SECRET}")
+          
+          HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -n -e 's/^HTTP_STATUS://p')
+          BODY=$(echo "$RESPONSE" | sed -e '/HTTP_STATUS:/d')
+
+          echo "Response Status: $HTTP_STATUS"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Scholarship sync failed with status $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Scholarship synchronization finished successfully."
