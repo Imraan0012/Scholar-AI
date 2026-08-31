@@ -15,24 +15,54 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Trigger Spring Boot Sync Endpoint
+      - name: Trigger Spring Boot Sync Endpoint with Cold-Start Resilience
         env:
-          BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-backend.onrender.com' }}
+          BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-l8uc.onrender.com' }}
           SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET || 'scholar-ai-sync-2026' }}
         run: |
-          echo "Triggering 12-hour official scholarship sync pipeline..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "${BACKEND_URL}/api/admin/sync/scholarships" \
-            -H "Content-Type: application/json" \
-            -H "X-Scheduler-Secret: ${SCHEDULER_SECRET}")
-          
-          HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -n -e 's/^HTTP_STATUS://p')
-          BODY=$(echo "$RESPONSE" | sed -e '/HTTP_STATUS:/d')
+          echo "Starting 12-hour official scholarship sync pipeline..."
+          ENDPOINT="${BACKEND_URL}/api/admin/sync/scholarships"
+          MAX_RETRIES=3
+          RETRY_DELAY=15
+          SUCCESS=0
 
-          echo "Response Status: $HTTP_STATUS"
-          echo "Response Body: $BODY"
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES: Calling sync endpoint..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$ENDPOINT" \
+              -H "Content-Type: application/json" \
+              -H "X-Scheduler-Secret: ${SCHEDULER_SECRET}" \
+              --max-time 30)
 
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "::error::Scholarship sync failed with status $HTTP_STATUS"
+            HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -n -e 's/^HTTP_STATUS://p')
+            BODY=$(echo "$RESPONSE" | sed -e '/HTTP_STATUS:/d')
+
+            echo "Response HTTP Status: $HTTP_STATUS"
+            echo "Response Body: $BODY"
+
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              # Validate JSON response
+              IS_SUCCESS=$(echo "$BODY" | grep -o '"success":\s*true' || true)
+              CHECKED_COUNT=$(echo "$BODY" | grep -o '"checkedCount":\s*[0-9]*' | grep -o '[0-9]*' || echo "0")
+
+              if [ -n "$IS_SUCCESS" ] && [ "$CHECKED_COUNT" -gt 0 ]; then
+                echo "✅ Synchronization succeeded. Processed $CHECKED_COUNT source(s)."
+                SUCCESS=1
+                break
+              elif [ -n "$IS_SUCCESS" ] && [ "$CHECKED_COUNT" -eq 0 ]; then
+                echo "::error::Synchronization completed with zero processed sources (checkedCount=0)."
+                exit 1
+              fi
+            fi
+
+            if [ "$i" -lt "$MAX_RETRIES" ]; then
+              echo "Cold start or transient status ($HTTP_STATUS). Retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "::error::Scholarship sync failed after $MAX_RETRIES attempts. Final HTTP Status: $HTTP_STATUS"
             exit 1
           fi
+
           echo "Scholarship synchronization finished successfully."
