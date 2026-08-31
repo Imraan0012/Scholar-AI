@@ -85,8 +85,27 @@ public class AdminSyncController {
                     .body(ApiResponse.error("Forbidden: Invalid or missing X-Scheduler-Secret header"));
         }
 
-        Map<String, Object> report = discoveryService.runDiscoveryPipeline();
-        return ResponseEntity.ok(ApiResponse.success("Discovery scan completed successfully", report));
+        String requestId = UUID.randomUUID().toString();
+        log.info("[DISCOVERY REQUEST] RequestId: {}, Authorized trigger received, starting pipeline execution...", requestId);
+
+        try {
+            Map<String, Object> report = discoveryService.runDiscoveryPipeline();
+            report.put("requestId", requestId);
+            return ResponseEntity.ok(ApiResponse.success("Discovery scan completed successfully", report));
+        } catch (Exception e) {
+            String errorType = e.getClass().getSimpleName();
+            String rootCause = e.getCause() != null ? e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage() : "None";
+            log.error("[DISCOVERY 500] RequestId: {}, ErrorType: {}, Message: {}, RootCause: {}",
+                    requestId, errorType, e.getMessage(), rootCause);
+
+            Map<String, Object> errorDetails = new java.util.LinkedHashMap<>();
+            errorDetails.put("requestId", requestId);
+            errorDetails.put("errorType", errorType);
+            errorDetails.put("success", false);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Discovery pipeline failed: " + errorType, errorDetails));
+        }
     }
 
     /**

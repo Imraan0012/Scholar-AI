@@ -37,6 +37,7 @@ public class ScholarshipDiscoveryCandidate {
     @Column(name = "source_url", columnDefinition = "TEXT", nullable = false)
     private String sourceUrl;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "candidate_payload", columnDefinition = "JSONB", nullable = false)
     private String candidatePayload;
 

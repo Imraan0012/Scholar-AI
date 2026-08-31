@@ -66,9 +66,11 @@ jobs:
               fi
             elif [ "$HTTP_STATUS" -eq 401 ] || [ "$HTTP_STATUS" -eq 403 ]; then
               echo "::error::Authentication failed with HTTP $HTTP_STATUS. Please verify SCHEDULER_SECRET."
+              echo "Response Body: $BODY"
               exit 1
             else
-              echo "::warning::Received HTTP $HTTP_STATUS. Render instance may be warming up. Waiting $RETRY_DELAY seconds..."
+              echo "::warning::Received HTTP $HTTP_STATUS. Render instance may be warming up or encountering an issue. Waiting $RETRY_DELAY seconds..."
+              echo "Response Body: $BODY"
               sleep $RETRY_DELAY
             fi
           done

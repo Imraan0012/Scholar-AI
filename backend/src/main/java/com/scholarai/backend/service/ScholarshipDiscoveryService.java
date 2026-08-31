@@ -55,23 +55,37 @@ public class ScholarshipDiscoveryService {
         int newCandidates = 0;
         List<String> stagedCandidateIds = new ArrayList<>();
 
-        log.info("[DISCOVERY START] Scanning across {} official source connectors...", sourcesConfigured);
+        log.info("[DISCOVERY START] Initializing All-India scholarship discovery scan.");
+        log.info("[SOURCE REGISTRY LOAD] Loaded {} registered source connectors.", sourcesConfigured);
+        log.info("[SOURCE COUNT] Connectors to process: {}", sourcesConfigured);
 
         for (ScholarshipSourceConnector connector : connectors) {
             sourcesChecked++;
-            log.info("[DISCOVERY] Querying connector: {} ({})", connector.getSourceName(), connector.getSourceId());
+            String sourceId = connector.getSourceId();
+            String sourceName = connector.getSourceName();
+            log.info("[DISCOVERY FETCH] Querying source: {} ({})", sourceName, sourceId);
+
             try {
                 List<Map<String, Object>> discoveredSchemes = connector.discoverSchemes();
+                log.info("[DISCOVERY FETCH] Source {} returned {} candidate scheme(s).", sourceId, discoveredSchemes != null ? discoveredSchemes.size() : 0);
+
+                if (discoveredSchemes == null || discoveredSchemes.isEmpty()) {
+                    continue;
+                }
+
                 for (Map<String, Object> scheme : discoveredSchemes) {
                     candidatesDiscovered++;
                     String schemeId = (String) scheme.get("id");
                     String schemeName = (String) scheme.get("name");
+
+                    log.debug("[NORMALIZATION] Normalizing scheme: {} ({})", schemeName, schemeId);
                     String contentHash = syncService.calculateContentHash(scheme);
 
                     // 1. Check if already exists in live scholarship database
                     Optional<Scholarship> existingInDb = scholarshipRepository.findById(schemeId);
                     if (existingInDb.isPresent()) {
                         duplicatesDetected++;
+                        log.info("[DEDUPLICATION] Scheme already exists in live database: {} ({})", schemeName, schemeId);
                         continue;
                     }
 
@@ -79,12 +93,14 @@ public class ScholarshipDiscoveryService {
                     Optional<ScholarshipDiscoveryCandidate> existingCandidate = candidateRepository.findByContentHash(contentHash);
                     if (existingCandidate.isPresent()) {
                         duplicatesDetected++;
+                        log.info("[DEDUPLICATION] Scheme already staged in review queue with hash {}: {}", contentHash, schemeName);
                         continue;
                     }
 
                     // 3. Stage genuinely new scheme for review
+                    log.info("[CANDIDATE PERSIST] Staging new scheme candidate for review: {} ({})", schemeName, schemeId);
                     ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
-                    candidate.setSourceId(connector.getSourceId());
+                    candidate.setSourceId(sourceId);
                     candidate.setExternalSchemeId((String) scheme.getOrDefault("official_scheme_id", schemeId));
                     candidate.setCandidateName(schemeName);
                     candidate.setProvider((String) scheme.getOrDefault("provider", "Official Provider"));
@@ -101,17 +117,20 @@ public class ScholarshipDiscoveryService {
                     ScholarshipDiscoveryCandidate saved = candidateRepository.save(candidate);
                     stagedCandidateIds.add(saved.getId().toString());
                     newCandidates++;
-                    log.info("[DISCOVERY STAGED] New Candidate: {} (UUID: {})", schemeName, saved.getId());
+                    log.info("[CANDIDATE PERSIST OK] Successfully staged candidate: {} (UUID: {})", schemeName, saved.getId());
                 }
             } catch (Exception connErr) {
-                log.error("[DISCOVERY ERROR] Connector {} failed: {}", connector.getSourceId(), connErr.getMessage());
+                String errClass = connErr.getClass().getSimpleName();
+                String errMsg = connErr.getMessage() != null ? connErr.getMessage() : "No message";
+                String rootCause = connErr.getCause() != null ? connErr.getCause().getClass().getSimpleName() + ": " + connErr.getCause().getMessage() : "None";
+                log.error("[DISCOVERY ERROR] Connector {} failed [{}]: {}. RootCause: {}", sourceId, errClass, errMsg, rootCause);
             }
         }
 
-        log.info("[DISCOVERY COMPLETE] Sources: {}, Discovered: {}, Duplicates: {}, Staged: {}",
+        log.info("[DISCOVERY COMPLETE] SourcesChecked: {}, CandidatesDiscovered: {}, DuplicatesDetected: {}, NewCandidatesStaged: {}",
                 sourcesChecked, candidatesDiscovered, duplicatesDetected, newCandidates);
 
-        Map<String, Object> report = new HashMap<>();
+        Map<String, Object> report = new LinkedHashMap<>();
         report.put("sourcesConfigured", sourcesConfigured);
         report.put("sourcesChecked", sourcesChecked);
         report.put("candidatesDiscovered", candidatesDiscovered);

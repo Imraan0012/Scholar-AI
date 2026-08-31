@@ -22,12 +22,15 @@ public class ScholarshipUpdateReview {
     @Column(name = "source_url", columnDefinition = "TEXT", nullable = false)
     private String sourceUrl;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "changed_fields", columnDefinition = "JSONB", nullable = false)
     private String changedFields = "[]";
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "old_values", columnDefinition = "JSONB", nullable = false)
     private String oldValues = "{}";
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "proposed_values", columnDefinition = "JSONB", nullable = false)
     private String proposedValues = "{}";
 

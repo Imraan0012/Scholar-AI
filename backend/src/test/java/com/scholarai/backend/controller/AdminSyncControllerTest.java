@@ -15,9 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AdminSyncControllerTest {
@@ -102,6 +103,37 @@ class AdminSyncControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(true, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testDiscoveryServiceExceptionReturnsSafe500() {
+        com.scholarai.backend.connector.ScholarshipSourceConnector failingConnector =
+                mock(com.scholarai.backend.connector.ScholarshipSourceConnector.class);
+        when(failingConnector.getSourceId()).thenThrow(new NullPointerException("Database connection lost unexpectedly"));
+
+        ScholarshipDiscoveryService failingDiscoveryService = new ScholarshipDiscoveryService(
+                List.of(failingConnector), candidateRepository, scholarshipRepository, sourceRepository, syncService, new ObjectMapper()
+        );
+
+        AdminSyncController failingController = new AdminSyncController(syncService, failingDiscoveryService);
+        ReflectionTestUtils.setField(failingController, "schedulerSecret", CONFIGURED_SECRET);
+
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                failingController.runDiscovery(CONFIGURED_SECRET);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        assertEquals("Discovery pipeline failed: NullPointerException", response.getBody().getMessage());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) response.getBody().getData();
+        assertNotNull(data);
+        assertEquals("NullPointerException", data.get("errorType"));
+        assertNotNull(data.get("requestId"));
+
+        // Guarantee secret is never in the response
+        String responseStr = response.toString();
+        assertFalse(responseStr.contains(CONFIGURED_SECRET));
     }
 
     @Test
