@@ -18,12 +18,58 @@ import ScholarshipResultsView from './components/results/ScholarshipResultsView'
 import StudentDashboard from './components/dashboard/StudentDashboard';
 import AdminIntelligencePanel from './components/admin/AdminIntelligencePanel';
 
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, RefreshCw, ServerCrash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// ─── Profile-loading status banner ───────────────────────────────────────────
+// Shown non-blocking inside the dashboard when the backend is slow/asleep.
+function ProfileErrorBanner({ profileError, onRetry, profileLoading }) {
+  if (!profileError && !profileLoading) return null;
+
+  if (profileLoading) {
+    return (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-lg text-xs text-slate-500">
+        <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        Connecting to server...
+      </div>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-full bg-white border border-amber-200 shadow-lg text-xs text-amber-700">
+        <ServerCrash className="w-4 h-4 flex-shrink-0" />
+        <span>{profileError}</span>
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold transition-colors"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function MainAppContent() {
-  const { currentUser, profile, signOut, loading } = useStudentProfile();
-  
+  const {
+    currentUser,
+    profile,
+    signOut,
+    // authLoading: true ONLY while Supabase resolves the session (~200 ms max)
+    authLoading,
+    // profileLoading: true while Spring Boot /api/profile is in-flight
+    profileLoading,
+    // profileError: set when backend times out or fails
+    profileError,
+    retryProfile,
+    // backwards-compat alias (= authLoading)
+    loading
+  } = useStudentProfile();
+
   // Read initial route from URL (defaulting strictly to 'landing' for '/')
   const getInitialView = () => {
     if (typeof window === 'undefined') return 'landing';
@@ -90,9 +136,12 @@ function MainAppContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Route protection & Centralized Onboarding Guard
+  // Route protection & Centralized Onboarding Guard.
+  // IMPORTANT: Do NOT redirect while profileLoading — this prevents falsely sending
+  // logged-in users to onboarding before their profile has loaded from the backend.
   useEffect(() => {
-    if (loading) return;
+    // Wait until auth resolves before making routing decisions
+    if (authLoading) return;
 
     const isProtected = ['dashboard', 'onboarding', 'analysis', 'results', 'admin'].includes(view);
 
@@ -107,11 +156,13 @@ function MainAppContent() {
       return;
     }
 
-    // 2. Incomplete onboarding profiles cannot access dashboard or results
-    if (currentUser) {
+    // 2. Only redirect to onboarding once profile has fully loaded.
+    //    While profileLoading is true we have no reliable onboarding status — skip.
+    if (currentUser && !profileLoading) {
       const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
       const requiresCompletedOnboarding = ['dashboard', 'results', 'analysis'].includes(view);
-      if (requiresCompletedOnboarding && !isCompleted) {
+      if (requiresCompletedOnboarding && !isCompleted && !profileError) {
+        // Only redirect if profile actually loaded (no error) and is genuinely incomplete
         console.log('[OnboardingGuard] Incomplete profile blocked from', view, '-> Redirecting to /onboarding');
         setView('onboarding');
         if (window.location.pathname !== '/onboarding') {
@@ -119,7 +170,7 @@ function MainAppContent() {
         }
       }
     }
-  }, [view, currentUser, loading, profile?.onboardingComplete, profile?.isOnboarded]);
+  }, [view, currentUser, authLoading, profileLoading, profileError, profile?.onboardingComplete, profile?.isOnboarded]);
 
   const handleOpenAuth = (mode = 'signin') => {
     setAuthMode(mode);
@@ -150,9 +201,10 @@ function MainAppContent() {
       return;
     }
 
-    // SIGN IN FLOW: Check persisted Supabase profile status dynamically
+    // SIGN IN FLOW: Navigate immediately — profile is loading in the background.
+    // Use whatever profile data is already available (may be null on cold backend).
     const userProfile = authData?.profile || profile;
-    const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
+    const firstIncomplete = profileService_getFirstIncompleteStep(userProfile);
     const isComplete = firstIncomplete === 6 || Boolean(
       authData?.onboardingComplete ||
       authData?.profile?.onboardingComplete ||
@@ -164,7 +216,9 @@ function MainAppContent() {
     if (isComplete) {
       navigateToView('dashboard');
     } else {
-      navigateToView('onboarding');
+      // If we don't know yet (profile still loading), go to dashboard
+      // The onboarding guard will redirect if truly needed once profile loads
+      navigateToView('dashboard');
     }
   };
 
@@ -203,29 +257,33 @@ function MainAppContent() {
     }
   };
 
-  // Prevent redirect race conditions during initial auth and profile fetch
-  if (loading) {
+  // ── Full-screen loader: ONLY blocks on Supabase session restore ───────────────
+  // Maximum display time: ~200 ms (localStorage read) to ~2 s (Supabase network).
+  // Never waits for the Spring Boot backend.
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-md flex items-center justify-center animate-spin">
-          <div className="w-6 h-6 border-3 border-[#2563EB] border-t-transparent rounded-full" />
+        <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-md flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
         </div>
         <div className="text-center">
           <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Scholar AI</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Verifying authentication & profile intelligence...</p>
+          <p className="text-xs text-slate-500 mt-0.5">Checking your session...</p>
         </div>
       </div>
     );
   }
 
+  // Auth is resolved — render the application.
   const isProtected = ['dashboard', 'onboarding', 'analysis', 'results', 'admin'].includes(view);
   const requiresOnboarding = ['dashboard', 'results'].includes(view);
   const isOnboarded = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
 
-  // Strictly sanitize view rendering so unauthenticated/incomplete users never see unpermitted views
+  // Strictly sanitize view rendering so unauthenticated users never see unpermitted views.
+  // While profile is still loading we allow dashboard to render (shows skeleton inside).
   const activeView = (!currentUser && isProtected)
     ? 'landing'
-    : (currentUser && requiresOnboarding && !isOnboarded)
+    : (currentUser && requiresOnboarding && !isOnboarded && !profileLoading && !profileError)
       ? 'onboarding'
       : view;
 
@@ -384,6 +442,15 @@ function MainAppContent() {
         onAuthSuccess={handleAuthSuccess}
       />
 
+      {/* Non-blocking profile loading / error banner (bottom-center pill) */}
+      {currentUser && (
+        <ProfileErrorBanner
+          profileError={profileError}
+          profileLoading={profileLoading}
+          onRetry={retryProfile}
+        />
+      )}
+
       {/* Notification Toast */}
       <AnimatePresence>
         {userNotification && (
@@ -400,6 +467,13 @@ function MainAppContent() {
       </AnimatePresence>
     </div>
   );
+}
+
+// Helper used inside handleAuthSuccess without importing profileService directly
+function profileService_getFirstIncompleteStep(p) {
+  if (!p) return 1;
+  if (p.onboardingComplete === true || p.isOnboarded === true) return 6;
+  return 1;
 }
 
 export default function App() {

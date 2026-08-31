@@ -85,9 +85,8 @@ export const authService = {
               console.log('[AuthService] Auto-confirm + retry sign-in succeeded');
               const user = retry.data.user;
               const session = retry.data.session;
-              let profile = null;
-              try { profile = await profileService.getProfile(user.id); } catch (pe) {}
-              return { success: true, user, session, profile, onboardingComplete: Boolean(profile?.onboardingComplete || profile?.isOnboarded), onboardingStep: profile?.onboardingStep || 1 };
+              // Profile is loaded non-blocking by StudentProfileContext after auth
+              return { success: true, user, session, profile: null };
             }
           } catch (confirmErr) {
             console.warn('[AuthService] Auto-confirm failed:', confirmErr.message);
@@ -112,21 +111,13 @@ export const authService = {
       const user = data.user;
       const session = data.session;
 
-      // Fast profile check
-      let profile = null;
-      try {
-        profile = await profileService.getProfile(user.id);
-      } catch (pe) {
-        console.warn('[AuthService] Profile fetch notice:', pe.message);
-      }
-
+      // Profile is loaded non-blocking by StudentProfileContext.loadUserData() after auth.
+      // Do NOT fetch profile here — it would block sign-in on Render cold starts.
       return {
         success: true,
         user,
         session,
-        profile,
-        onboardingComplete: Boolean(profile?.onboardingComplete || profile?.isOnboarded),
-        onboardingStep: profile?.onboardingStep || 1
+        profile: null
       };
     } catch (err) {
       console.error('[AuthService] Sign in exception:', err);

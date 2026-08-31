@@ -1,9 +1,14 @@
 // =============================================================================
 // SCHOLAR AI — CENTRAL API CLIENT FOR SPRING BOOT REST BACKEND
 // Communicates with Spring Boot API using Supabase JWT Bearer Tokens.
+// AbortController with 12-second timeout — Render cold-start never hangs.
 // =============================================================================
 
 import { supabase } from '../lib/supabaseClient';
+
+// How long to wait for the Render backend before aborting (ms).
+// Render free tier can take up to 30 s to wake, but we give 12 s then retry once.
+const REQUEST_TIMEOUT_MS = 12_000;
 
 export function getNormalizedApiBase() {
   let base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api').trim();
@@ -32,6 +37,31 @@ async function getAuthHeaders() {
   return headers;
 }
 
+/**
+ * Core fetch wrapper with AbortController timeout.
+ * Throws a typed error on timeout so callers can distinguish cold-start from
+ * genuine server errors.
+ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const timeoutError = new Error('Request timed out — backend may be starting up. Please retry in a moment.');
+      timeoutError.isTimeout = true;
+      timeoutError.status = 408;
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const apiClient = {
   async get(endpoint, params = {}) {
     const headers = await getAuthHeaders();
@@ -44,7 +74,7 @@ export const apiClient = {
       }
     });
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: 'GET',
       headers
     });
@@ -55,11 +85,14 @@ export const apiClient = {
   async post(endpoint, body = {}) {
     const headers = await getAuthHeaders();
     const apiBase = getNormalizedApiBase();
-    const response = await fetch(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
+    const response = await fetchWithTimeout(
+      `${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      }
+    );
 
     return handleResponse(response);
   },
@@ -67,11 +100,14 @@ export const apiClient = {
   async put(endpoint, body = {}) {
     const headers = await getAuthHeaders();
     const apiBase = getNormalizedApiBase();
-    const response = await fetch(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(body)
-    });
+    const response = await fetchWithTimeout(
+      `${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`,
+      {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body)
+      }
+    );
 
     return handleResponse(response);
   },
@@ -79,10 +115,13 @@ export const apiClient = {
   async delete(endpoint) {
     const headers = await getAuthHeaders();
     const apiBase = getNormalizedApiBase();
-    const response = await fetch(`${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`, {
-      method: 'DELETE',
-      headers
-    });
+    const response = await fetchWithTimeout(
+      `${apiBase}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`,
+      {
+        method: 'DELETE',
+        headers
+      }
+    );
 
     return handleResponse(response);
   }

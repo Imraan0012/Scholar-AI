@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { authService } from '../services/authService';
 import { profileService } from '../services/profileService';
 import { scholarshipService } from '../services/scholarshipService';
@@ -115,17 +115,67 @@ export const createEmptyProfile = (user = null) => {
   };
 };
 
+// ─── Safe localStorage helpers ────────────────────────────────────────────────
+function readProfileHint() {
+  try {
+    const raw = localStorage.getItem('scholar_ai_profile_hint');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+
+function writeProfileHint(profileExists, onboardingCompleted) {
+  try {
+    localStorage.setItem('scholar_ai_profile_hint', JSON.stringify({
+      profileExists,
+      onboardingCompleted,
+      cachedAt: Date.now()
+    }));
+  } catch (e) {}
+}
+
+function clearProfileHint() {
+  try {
+    localStorage.removeItem('scholar_ai_profile_hint');
+  } catch (e) {}
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 export const StudentProfileProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [profile, setProfile] = useState(() => createEmptyProfile(null));
-
   const [scholarships, setScholarships] = useState(MASTER_SCHOLARSHIP_REGISTRY);
   const [bookmarks, setBookmarks] = useState([]);
   const [savedApplications, setSavedApplications] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  const loadUserData = useCallback(async (user) => {
+  // ── Granular loading states ─────────────────────────────────────────────────
+  // authLoading: true only while Supabase resolves the session (~200 ms).
+  //   The full-screen loader in App.jsx is gated on this.
+  const [authLoading, setAuthLoading] = useState(true);
+  // profileLoading: true while Spring Boot /api/profile is in-flight.
+  //   Never blocks the whole app — only shows skeletons inside profile sections.
+  const [profileLoading, setProfileLoading] = useState(false);
+  // profileError: message string when backend failed/timed out; null otherwise.
+  const [profileError, setProfileError] = useState(null);
+
+  // ── Initialization guard ─────────────────────────────────────────────────────
+  // Prevents React StrictMode double-invocation from running initSession twice.
+  const initStarted = useRef(false);
+
+  // ── Scholarship loader (non-blocking) ────────────────────────────────────────
+  const loadScholarshipsAsync = useCallback(() => {
+    scholarshipService.getScholarships().then(({ scholarships: fetchedList }) => {
+      if (fetchedList && fetchedList.length > 0) {
+        setScholarships(fetchedList);
+      }
+    }).catch(() => {
+      // Silently fall back to the local registry already in state
+    });
+  }, []);
+
+  // ── Profile + auxiliary data loader ─────────────────────────────────────────
+  const loadUserData = useCallback(async (user, { isRetry = false } = {}) => {
     if (!user?.id) {
       setProfile(createEmptyProfile(null));
       setBookmarks([]);
@@ -134,85 +184,92 @@ export const StudentProfileProvider = ({ children }) => {
       return;
     }
 
-    const [userProfile, userBookmarks, userApps, userNotifs] = await Promise.all([
-      profileService.getProfile(user.id).catch(() => null),
-      bookmarkService.getBookmarks(user.id).catch(() => []),
-      applicationService.getApplications(user.id).catch(() => []),
-      notificationService.getNotifications(user.id).catch(() => [])
-    ]);
+    setProfileLoading(true);
+    if (!isRetry) setProfileError(null);
 
-    const empty = createEmptyProfile(user);
-    const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
-    const isCompleted = firstIncomplete === 6 || Boolean(userProfile?.onboardingComplete || userProfile?.isOnboarded);
-    const step = isCompleted ? 6 : firstIncomplete;
-
-    const cleanProfile = {
-      ...empty,
-      ...(userProfile || {}),
-      isOnboarded: isCompleted,
-      onboardingComplete: isCompleted,
-      onboardingStep: step
-    };
-
-    setProfile(cleanProfile);
     try {
-      localStorage.setItem('scholar_ai_student_profile', JSON.stringify(cleanProfile));
-      localStorage.setItem('scholar_ai_onboarding_step', String(step));
-    } catch (e) {}
+      // Profile fetch — can time-out (AbortController in apiClient).
+      // Bookmarks / apps / notifs are lightweight Supabase calls, run in parallel.
+      const [userProfile, userBookmarks, userApps, userNotifs] = await Promise.all([
+        profileService.getProfile(user.id).catch((err) => {
+          // Re-throw so we can set profileError below
+          throw err;
+        }),
+        bookmarkService.getBookmarks(user.id).catch(() => []),
+        applicationService.getApplications(user.id).catch(() => []),
+        notificationService.getNotifications(user.id).catch(() => [])
+      ]);
 
-    setBookmarks(Array.isArray(userBookmarks) ? userBookmarks : []);
-    setSavedApplications(Array.isArray(userApps) ? userApps : []);
-    setNotifications(Array.isArray(userNotifs) ? userNotifs : []);
+      const empty = createEmptyProfile(user);
+      const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
+      const isCompleted = firstIncomplete === 6 || Boolean(userProfile?.onboardingComplete || userProfile?.isOnboarded);
+      const step = isCompleted ? 6 : firstIncomplete;
+
+      const cleanProfile = {
+        ...empty,
+        ...(userProfile || {}),
+        isOnboarded: isCompleted,
+        onboardingComplete: isCompleted,
+        onboardingStep: step
+      };
+
+      setProfile(cleanProfile);
+      setProfileError(null);
+
+      // Cache only harmless hint — never the full profile data
+      writeProfileHint(true, isCompleted);
+      try {
+        localStorage.setItem('scholar_ai_onboarding_step', String(step));
+      } catch (e) {}
+
+      setBookmarks(Array.isArray(userBookmarks) ? userBookmarks : []);
+      setSavedApplications(Array.isArray(userApps) ? userApps : []);
+      setNotifications(Array.isArray(userNotifs) ? userNotifs : []);
+    } catch (err) {
+      const isTimeout = err?.isTimeout === true;
+      const msg = isTimeout
+        ? 'Server is waking up — this may take a moment.'
+        : 'Could not load your profile. Check your connection.';
+
+      console.warn('[StudentProfileContext] loadUserData error:', err.message);
+      setProfileError(msg);
+      // Do NOT sign the user out or clear their session on profile failure.
+      // Do NOT redirect to onboarding on failure.
+    } finally {
+      setProfileLoading(false);
+    }
   }, []);
 
+  // ── Retry handler (callable from UI) ────────────────────────────────────────
+  const retryProfile = useCallback(() => {
+    if (currentUser) {
+      loadUserData(currentUser, { isRetry: true });
+    }
+  }, [currentUser, loadUserData]);
+
+  // ── Main initialization effect ───────────────────────────────────────────────
   useEffect(() => {
+    // Guard against React StrictMode double-invoke
+    if (initStarted.current) return;
+    initStarted.current = true;
+
     let mounted = true;
 
     async function initSession() {
+      // ── Phase 1: Resolve Supabase session ───────────────────────────────────
+      // This is the ONLY thing that holds the full-screen loader.
+      // Supabase reads from localStorage — should resolve in < 200 ms.
+      let user = null;
       try {
-        const user = await authService.getCurrentUser();
-        if (mounted) {
-          if (user) {
-            setCurrentUser(user);
-            await loadUserData(user);
-          } else {
-            setCurrentUser(null);
-            setProfile(createEmptyProfile(null));
-            setBookmarks([]);
-            setSavedApplications([]);
-            setNotifications([]);
-          }
-        }
+        user = await authService.getCurrentUser();
       } catch (err) {
-        if (mounted) {
-          setCurrentUser(null);
-          setProfile(createEmptyProfile(null));
-        }
+        console.warn('[StudentProfileContext] Supabase session error:', err.message);
       }
 
-      try {
-        const { scholarships: fetchedList } = await scholarshipService.getScholarships();
-        if (mounted && fetchedList && fetchedList.length > 0) {
-          setScholarships(fetchedList);
-        }
-      } catch (err) {
-        // Fallback to registry
-      }
-
-      if (mounted) setLoading(false);
-    }
-
-    initSession();
-
-    const unsubscribeAuth = authService.onAuthStateChange(async (event, user) => {
       if (!mounted) return;
-      if (event === 'INITIAL_SESSION') {
-        // Handled by initSession
-        return;
-      }
+
       if (user) {
         setCurrentUser(user);
-        await loadUserData(user);
       } else {
         setCurrentUser(null);
         setProfile(createEmptyProfile(null));
@@ -220,15 +277,51 @@ export const StudentProfileProvider = ({ children }) => {
         setSavedApplications([]);
         setNotifications([]);
       }
+
+      // ── Phase 2: App is now unblocked — clear authLoading ───────────────────
+      setAuthLoading(false);
+
+      // ── Phase 3: Non-blocking background fetches ─────────────────────────────
+      if (user) {
+        // loadUserData manages its own profileLoading / profileError state
+        loadUserData(user);
+      }
+
+      // Scholarships: always load async, no impact on startup
+      loadScholarshipsAsync();
+    }
+
+    initSession();
+
+    // ── Auth state change listener ──────────────────────────────────────────────
+    const unsubscribeAuth = authService.onAuthStateChange(async (event, user) => {
+      if (!mounted) return;
+
+      // INITIAL_SESSION is handled by initSession — ignore to prevent duplicate fetch
+      if (event === 'INITIAL_SESSION') return;
+
+      if (user) {
+        setCurrentUser(user);
+        loadUserData(user);
+      } else {
+        setCurrentUser(null);
+        setProfile(createEmptyProfile(null));
+        setBookmarks([]);
+        setSavedApplications([]);
+        setNotifications([]);
+        setProfileLoading(false);
+        setProfileError(null);
+        clearProfileHint();
+      }
     });
 
     return () => {
       mounted = false;
       unsubscribeAuth();
     };
-  }, [loadUserData]);
+  }, [loadUserData, loadScholarshipsAsync]);
 
-  // Real-time notifications subscription for authenticated user
+  // ── Real-time notifications subscription ────────────────────────────────────
   useEffect(() => {
     if (!currentUser?.id) return;
 
@@ -247,17 +340,16 @@ export const StudentProfileProvider = ({ children }) => {
     };
   }, [currentUser?.id]);
 
+  // ── Eligibility evaluation ────────────────────────────────────────────────────
   const [evaluationResults, setEvaluationResults] = useState(() => {
     return eligibilityService.evaluateAll(profile, scholarships);
   });
 
-  // Calculate deterministic evaluation instantly whenever profile or scholarships change
   useEffect(() => {
     const evaluated = eligibilityService.evaluateAll(profile, scholarships);
     setEvaluationResults(evaluated);
   }, [profile, scholarships]);
 
-  // Recalculate from backend on demand (e.g. for analysis view)
   const recalculateBackendEligibility = useCallback(async () => {
     if (currentUser?.id) {
       try {
@@ -275,16 +367,14 @@ export const StudentProfileProvider = ({ children }) => {
     return localEval;
   }, [currentUser?.id, profile, scholarships]);
 
+  // ── Profile mutation ──────────────────────────────────────────────────────────
   const updateProfile = useCallback((updates) => {
     setProfile(prev => {
       const merged = { ...prev, ...updates };
-      try {
-        localStorage.setItem('scholar_ai_student_profile', JSON.stringify(merged));
-      } catch (e) {}
       return merged;
     });
 
-    // Non-blocking asynchronous sync to backend
+    // Non-blocking async sync to backend
     if (currentUser?.id) {
       profileService.saveProfile(updates).catch(err => {
         console.warn('[StudentProfileContext] Background profile sync notice:', err.message);
@@ -292,6 +382,7 @@ export const StudentProfileProvider = ({ children }) => {
     }
   }, [currentUser?.id]);
 
+  // ── Bookmarks ─────────────────────────────────────────────────────────────────
   const toggleBookmark = useCallback(async (scholarshipId) => {
     const { bookmarks: updated } = await bookmarkService.toggleBookmark(currentUser?.id, scholarshipId);
     setBookmarks(updated);
@@ -301,6 +392,7 @@ export const StudentProfileProvider = ({ children }) => {
     return bookmarks.includes(scholarshipId);
   }, [bookmarks]);
 
+  // ── Applications ──────────────────────────────────────────────────────────────
   const saveApplication = useCallback(async (scholarship, customStatus = 'APPLIED') => {
     const updated = await applicationService.recordAction(currentUser?.id, scholarship, customStatus);
     setSavedApplications(updated);
@@ -321,26 +413,14 @@ export const StudentProfileProvider = ({ children }) => {
     setSavedApplications(updated);
   }, [currentUser]);
 
+  // ── Auth helpers ──────────────────────────────────────────────────────────────
   const signIn = async (email, password) => {
     const res = await authService.signIn({ email, password });
     if (res.success && res.user) {
       setCurrentUser(res.user);
-      const empty = createEmptyProfile(res.user);
-      const firstIncomplete = profileService.getFirstIncompleteStep(res.profile);
-      const isCompleted = firstIncomplete === 6 || Boolean(res.profile?.onboardingComplete || res.profile?.isOnboarded || res.onboardingComplete);
-      const step = isCompleted ? 6 : firstIncomplete;
-      const cleanProfile = {
-        ...empty,
-        ...(res.profile || {}),
-        isOnboarded: isCompleted,
-        onboardingComplete: isCompleted,
-        onboardingStep: step
-      };
-      setProfile(cleanProfile);
-      try {
-        localStorage.setItem('scholar_ai_student_profile', JSON.stringify(cleanProfile));
-        localStorage.setItem('scholar_ai_onboarding_step', String(step));
-      } catch (e) {}
+      // Profile will be loaded by the onAuthStateChange listener or can be
+      // triggered explicitly here for immediate feedback.
+      loadUserData(res.user);
     }
     return res;
   };
@@ -360,10 +440,7 @@ export const StudentProfileProvider = ({ children }) => {
         onboardingStep: 1
       };
       setProfile(cleanProfile);
-      try {
-        localStorage.setItem('scholar_ai_student_profile', JSON.stringify(cleanProfile));
-        localStorage.setItem('scholar_ai_onboarding_step', '1');
-      } catch (e) {}
+      writeProfileHint(true, false);
     }
     return res;
   };
@@ -379,11 +456,16 @@ export const StudentProfileProvider = ({ children }) => {
       setBookmarks([]);
       setSavedApplications([]);
       setNotifications([]);
-      localStorage.removeItem('scholar_ai_user_bookmarks');
-      localStorage.removeItem('scholar_ai_saved_applications');
-      localStorage.removeItem('scholar_ai_student_profile');
-      localStorage.removeItem('scholar_ai_user_notifications');
-      localStorage.removeItem('scholar_ai_onboarding_step');
+      setProfileLoading(false);
+      setProfileError(null);
+      clearProfileHint();
+      try {
+        localStorage.removeItem('scholar_ai_user_bookmarks');
+        localStorage.removeItem('scholar_ai_saved_applications');
+        localStorage.removeItem('scholar_ai_student_profile');
+        localStorage.removeItem('scholar_ai_user_notifications');
+        localStorage.removeItem('scholar_ai_onboarding_step');
+      } catch (e) {}
     }
   };
 
@@ -395,6 +477,7 @@ export const StudentProfileProvider = ({ children }) => {
     return await authService.updatePassword(newPassword);
   };
 
+  // ── Notifications ─────────────────────────────────────────────────────────────
   const markNotificationRead = useCallback(async (notificationId) => {
     if (!notificationId) return;
     setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
@@ -428,6 +511,11 @@ export const StudentProfileProvider = ({ children }) => {
   const unreadNotificationCount = notifications.filter(n => !n.read).length;
   const profileCompletionScore = profileService.calculateCompletion(profile);
 
+  // ── Backwards-compatible `loading` alias ─────────────────────────────────────
+  // Some child components may still read `loading`. Expose it as authLoading so
+  // they continue to work during the transition without requiring mass refactor.
+  const loading = authLoading;
+
   return (
     <StudentProfileContext.Provider
       value={{
@@ -458,6 +546,12 @@ export const StudentProfileProvider = ({ children }) => {
         resetPasswordForEmail,
         updatePassword,
         recalculateBackendEligibility,
+        retryProfile,
+        // Granular loading states
+        authLoading,
+        profileLoading,
+        profileError,
+        // Backwards-compat alias (authLoading only — never profile)
         loading,
         profileCompletionScore
       }}
@@ -468,4 +562,3 @@ export const StudentProfileProvider = ({ children }) => {
 };
 
 export const useStudentProfile = () => useContext(StudentProfileContext);
-
