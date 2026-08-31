@@ -138,7 +138,24 @@ public class AdminSyncController {
         }
 
         Scholarship published = discoveryService.approveAndPublishCandidate(id, reviewer);
-        return ResponseEntity.ok(ApiResponse.success("Candidate approved and published to live catalog", published));
+        return ResponseEntity.ok(ApiResponse.success("Candidate approved and published successfully", published));
+    }
+
+    /**
+     * Batch-publishes all verified SAFE_NEW pending candidates while rejecting duplicates.
+     */
+    @PostMapping({"/publish-safe", "/discovery/publish-safe"})
+    public ResponseEntity<ApiResponse<Map<String, Object>>> publishSafeCandidates(
+            @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret,
+            @RequestParam(defaultValue = "ADMIN_REVIEWER") String reviewer) {
+
+        if (!isAuthorized(headerSecret)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Forbidden: Invalid or missing X-Scheduler-Secret header"));
+        }
+
+        Map<String, Object> summary = discoveryService.publishAllSafePendingCandidates(reviewer);
+        return ResponseEntity.ok(ApiResponse.success("Safe candidates published successfully", summary));
     }
 
     /**

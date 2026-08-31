@@ -106,6 +106,42 @@ class ScholarshipDiscoveryServiceTest {
     }
 
     @Test
+    void testPublishAllSafePendingCandidatesProcessesSafeAndRejectsDuplicates() {
+        ScholarshipDiscoveryCandidate safeCandidate = new ScholarshipDiscoveryCandidate();
+        safeCandidate.setId(UUID.randomUUID());
+        safeCandidate.setCandidateName("Unique Special Foundation Grant 2026");
+        safeCandidate.setProvider("Special Trust");
+        safeCandidate.setCandidatePayload("{\"id\":\"unique-grant-2026\",\"name\":\"Unique Special Foundation Grant 2026\",\"provider\":\"Special Trust\"}");
+        safeCandidate.setStatus("PENDING_REVIEW");
+
+        ScholarshipDiscoveryCandidate duplicateCandidate = new ScholarshipDiscoveryCandidate();
+        duplicateCandidate.setId(UUID.randomUUID());
+        duplicateCandidate.setCandidateName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+        duplicateCandidate.setProvider("AICTE");
+        duplicateCandidate.setCandidatePayload("{\"id\":\"aicte-pragati-new\",\"name\":\"AICTE Pragati Scholarship Scheme for Girl Students (Degree)\",\"provider\":\"AICTE\"}");
+        duplicateCandidate.setStatus("PENDING_REVIEW");
+
+        Scholarship existingLive = new Scholarship();
+        existingLive.setId("aicte-pragati-degree");
+        existingLive.setName("AICTE Pragati Scholarship Scheme for Girl Students (Degree)");
+
+        when(candidateRepository.findByStatus("PENDING_REVIEW")).thenReturn(List.of(safeCandidate, duplicateCandidate));
+        when(candidateRepository.findById(safeCandidate.getId())).thenReturn(Optional.of(safeCandidate));
+        when(candidateRepository.findById(duplicateCandidate.getId())).thenReturn(Optional.of(duplicateCandidate));
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existingLive));
+        when(scholarshipRepository.save(any(Scholarship.class))).thenAnswer(i -> i.getArgument(0));
+        when(candidateRepository.save(any(ScholarshipDiscoveryCandidate.class))).thenAnswer(i -> i.getArgument(0));
+
+        Map<String, Object> summary = discoveryService.publishAllSafePendingCandidates("ADMIN_REVIEWER");
+
+        assertNotNull(summary);
+        assertEquals(2, summary.get("totalPendingEvaluated"));
+        assertEquals(1, summary.get("publishedCount"));
+        assertEquals(1, summary.get("duplicateCount"));
+        assertEquals(0, summary.get("failedCount"));
+    }
+
+    @Test
     void testApproveAndPublishCandidatePersistsLiveScholarship() {
         UUID candidateId = UUID.randomUUID();
         ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();

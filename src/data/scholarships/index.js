@@ -13,6 +13,7 @@ import { NORTH_INDIA_STATE_SCHOLARSHIPS } from './stateScholarshipsNorth.js';
 import { EAST_NORTHEAST_STATE_SCHOLARSHIPS } from './stateScholarshipsEastNorthEast.js';
 import { CORPORATE_TRUST_SCHOLARSHIPS } from './corporateTrusts.js';
 import { INSTITUTIONAL_SCHOLARSHIPS } from './institutionalScholarships.js';
+import { DISCOVERED_VERIFIED_SCHOLARSHIPS } from './discoveredScholarships.js';
 import { deduplicateScholarships } from '../../services/deduplicationService.js';
 
 // Master raw array of official verified scholarships
@@ -24,7 +25,8 @@ export const RAW_SCHOLARSHIP_REGISTRY = [
   ...NORTH_INDIA_STATE_SCHOLARSHIPS,
   ...EAST_NORTHEAST_STATE_SCHOLARSHIPS,
   ...CORPORATE_TRUST_SCHOLARSHIPS,
-  ...INSTITUTIONAL_SCHOLARSHIPS
+  ...INSTITUTIONAL_SCHOLARSHIPS,
+  ...DISCOVERED_VERIFIED_SCHOLARSHIPS
 ];
 
 // Master unified and deduplicated array of official verified scholarships

@@ -208,6 +208,45 @@ public class ScholarshipDiscoveryService {
     }
 
     /**
+     * Safely approves and publishes all genuine SAFE_NEW pending candidates,
+     * while classifying any matching candidates as DUPLICATE.
+     */
+    @Transactional
+    public Map<String, Object> publishAllSafePendingCandidates(String reviewer) {
+        List<ScholarshipDiscoveryCandidate> pendingList = candidateRepository.findByStatus("PENDING_REVIEW");
+        int totalPending = pendingList.size();
+        int publishedCount = 0;
+        int duplicateCount = 0;
+        int failedCount = 0;
+        List<String> publishedIds = new ArrayList<>();
+        List<String> duplicateIds = new ArrayList<>();
+
+        for (ScholarshipDiscoveryCandidate candidate : pendingList) {
+            try {
+                Scholarship published = approveAndPublishCandidate(candidate.getId(), reviewer);
+                publishedCount++;
+                publishedIds.add(published.getId());
+            } catch (IllegalStateException dupEx) {
+                // Was marked as DUPLICATE by approveAndPublishCandidate
+                duplicateCount++;
+                duplicateIds.add(candidate.getId().toString());
+            } catch (Exception ex) {
+                failedCount++;
+                log.error("[BATCH PUBLISH ERROR] Failed to publish candidate {}: {}", candidate.getId(), ex.getMessage());
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalPendingEvaluated", totalPending);
+        result.put("publishedCount", publishedCount);
+        result.put("duplicateCount", duplicateCount);
+        result.put("failedCount", failedCount);
+        result.put("publishedIds", publishedIds);
+        result.put("duplicateIds", duplicateIds);
+        return result;
+    }
+
+    /**
      * Approves and publishes a discovery candidate into the live scholarship database.
      */
     @Transactional
