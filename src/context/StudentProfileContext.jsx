@@ -282,13 +282,14 @@ export const StudentProfileProvider = ({ children }) => {
       setAuthLoading(false);
 
       // ── Phase 3: Non-blocking background fetches ─────────────────────────────
+      // IMPORTANT: Only fetch backend data when the user is authenticated.
+      // Public routes (/, /signup, /login) must never contact the Render backend.
       if (user) {
         // loadUserData manages its own profileLoading / profileError state
         loadUserData(user);
+        // Scholarships: load async for authenticated users only
+        loadScholarshipsAsync();
       }
-
-      // Scholarships: always load async, no impact on startup
-      loadScholarshipsAsync();
     }
 
     initSession();

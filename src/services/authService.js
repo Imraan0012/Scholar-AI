@@ -157,17 +157,27 @@ export const authService = {
 
     try {
       // STEP 1: Register via backend (no email sending, no rate limits)
+      // AbortController with 10-second timeout — Render cold-start must never block signup.
       let registerRes;
       try {
-        const response = await fetch(`${API_BASE}/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: normalizedEmail, password, fullName: trimmedName })
-        });
+        const registerController = new AbortController();
+        const registerTimeout = setTimeout(() => registerController.abort(), 10_000);
+        let response;
+        try {
+          response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: normalizedEmail, password, fullName: trimmedName }),
+            signal: registerController.signal
+          });
+        } finally {
+          clearTimeout(registerTimeout);
+        }
         registerRes = await response.json();
       } catch (fetchErr) {
-        console.warn('[AuthService] Backend register failed:', fetchErr.message, 'Endpoint:', `${API_BASE}/auth/register`);
-        // Fallback to Supabase if backend is unreachable
+        // Timed out or network error — fall back to Supabase native signup immediately
+        const reason = fetchErr?.name === 'AbortError' ? 'timeout' : fetchErr.message;
+        console.warn('[AuthService] Backend register failed (' + reason + '), falling back to Supabase:', `${API_BASE}/auth/register`);
         return await this._supabaseSignUp(normalizedEmail, password, trimmedName);
       }
 
@@ -185,19 +195,18 @@ export const authService = {
       const signInResult = await this.signIn({ email: normalizedEmail, password });
 
       if (signInResult.success) {
-        // Create initial profile stub if new account
+        // Create initial profile stub if new account — fire-and-forget, do NOT block signup return.
+        // This call goes to the Render backend which may be cold; never make signup wait for it.
         if (registerRes?.data?.created) {
-          try {
-            await profileService.saveProfile({
-              user_id: signInResult.user.id,
-              fullName: trimmedName,
-              email: normalizedEmail,
-              onboardingStep: 1,
-              onboardingComplete: false
-            }, signInResult.user.id);
-          } catch (pe) {
-            console.warn('[AuthService] Initial profile create warning:', pe.message);
-          }
+          profileService.saveProfile({
+            user_id: signInResult.user.id,
+            fullName: trimmedName,
+            email: normalizedEmail,
+            onboardingStep: 1,
+            onboardingComplete: false
+          }, signInResult.user.id).catch(pe => {
+            console.warn('[AuthService] Initial profile create notice (non-blocking):', pe.message);
+          });
         }
         return {
           success: true,
