@@ -7,19 +7,25 @@
 /**
  * Calculates current deadline lifecycle status.
  */
-export function calculateDeadlineStatus(deadlineDateStr, startDateStr) {
-  if (!deadlineDateStr) return 'YEAR_ROUND';
+export function calculateDeadlineStatus(deadlineDateStr, startDateStr, explicitStatus) {
+  if (explicitStatus && explicitStatus !== 'OPEN') {
+    return explicitStatus;
+  }
+  if (!deadlineDateStr) {
+    if (explicitStatus === 'YEAR_ROUND') return 'YEAR_ROUND';
+    return explicitStatus || 'AVAILABILITY_UNVERIFIED';
+  }
   
   const today = new Date();
   const deadline = new Date(deadlineDateStr);
   const start = startDateStr ? new Date(startDateStr) : null;
 
   if (start && !isNaN(start.getTime()) && today < start) {
-    return 'NOT_YET_OPEN';
+    return 'UPCOMING';
   }
 
   if (isNaN(deadline.getTime())) {
-    return 'YEAR_ROUND';
+    return explicitStatus || 'AVAILABILITY_UNVERIFIED';
   }
 
   const diffTime = deadline.getTime() - today.getTime();
@@ -549,7 +555,8 @@ export function evaluateScholarship(profile, scholarship) {
 
   const deadlineStatus = calculateDeadlineStatus(
     scholarship.application_deadline || scholarship.applicationDeadline,
-    scholarship.application_start || scholarship.applicationStart
+    scholarship.application_start || scholarship.applicationStart || scholarship.application_open_date || scholarship.applicationOpenDate,
+    scholarship.status
   );
 
   // Generate audit-grade human explanation

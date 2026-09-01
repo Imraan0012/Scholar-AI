@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, AlertCircle, ExternalLink, Calendar, ShieldCheck, FileText, Building, Clock, Check } from 'lucide-react';
 import { generateEligibilityExplanation } from '../../engine/aiExplanations';
+import { calculateDeadlineStatus } from '../../engine/eligibilityEngine';
 import { useStudentProfile } from '../../context/StudentProfileContext';
 
 // Utility: Get official verified URLs for a scholarship
@@ -70,12 +71,38 @@ export default function ScholarshipDetailModal({ scholarship, evaluation, result
   const explanation = generateEligibilityExplanation(activeResult, profile);
   const { applicationUrl, websiteUrl } = getScholarshipUrls(activeScholarship);
   const targetUrl = applicationUrl || websiteUrl;
-  const buttonText = applicationUrl ? 'Apply Now' : websiteUrl ? 'View Official Website' : 'Application Link Unavailable';
-  const isLinkDisabled = !targetUrl;
   const govLevel = activeScholarship.government_level || activeScholarship.governmentLevel || 'OFFICIAL';
   const amountDisplay = activeScholarship.amount_display || activeScholarship.amountDisplay || activeScholarship.amount || 'As per norms';
   const deadline = activeScholarship.application_deadline || activeScholarship.applicationDeadline || activeScholarship.deadline;
+  const openDate = activeScholarship.application_open_date || activeScholarship.applicationOpenDate || activeScholarship.application_start;
+  const rawStatus = activeScholarship.status;
   const reqDocs = activeScholarship.required_documents || activeScholarship.requiredDocuments || [];
+
+  const lifecycleStatus = calculateDeadlineStatus(deadline, openDate, rawStatus);
+
+  let buttonText = 'Apply Now';
+  const isLinkDisabled = !targetUrl;
+
+  if (lifecycleStatus === 'CLOSED') {
+    buttonText = 'Applications Closed';
+  } else if (lifecycleStatus === 'UPCOMING' || lifecycleStatus === 'NOT_YET_OPEN') {
+    buttonText = 'Upcoming Cycle';
+  } else if (lifecycleStatus === 'AVAILABILITY_UNVERIFIED' || lifecycleStatus === 'UNKNOWN') {
+    buttonText = 'Check Official Website';
+  } else if (lifecycleStatus === 'YEAR_ROUND') {
+    buttonText = 'Apply (Year-Round)';
+  } else {
+    buttonText = applicationUrl ? 'Apply Now' : (websiteUrl ? 'Check Official Website' : 'Application Link Unavailable');
+  }
+
+  const formatDeadlineDisplay = (dStr) => {
+    if (dStr) return formatDeadline(dStr);
+    if (lifecycleStatus === 'YEAR_ROUND') return 'Year-Round / Rolling';
+    if (lifecycleStatus === 'AVAILABILITY_UNVERIFIED' || lifecycleStatus === 'UNKNOWN') return 'Availability Unverified (Check Portal)';
+    if (lifecycleStatus === 'UPCOMING') return 'Upcoming Cycle';
+    if (lifecycleStatus === 'CLOSED') return 'Applications Closed';
+    return 'Check Official Portal';
+  };
 
   const handleApplyClick = () => {
     if (targetUrl) {
@@ -171,7 +198,7 @@ export default function ScholarshipDetailModal({ scholarship, evaluation, result
               <span className="text-xs text-slate-500 uppercase tracking-wider font-bold block">Application Deadline</span>
               <span className="text-sm font-bold text-slate-900 block mt-0.5 flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-slate-400" />
-                {formatDeadline(deadline)}
+                {formatDeadlineDisplay(deadline)}
               </span>
             </div>
           </div>

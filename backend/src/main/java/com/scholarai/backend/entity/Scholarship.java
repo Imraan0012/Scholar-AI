@@ -72,7 +72,7 @@ public class Scholarship {
     private String officialSchemeId;
 
     @Column(name = "status", length = 30)
-    private String status = "OPEN"; // OPEN, CLOSING_SOON, CLOSED, NOT_YET_OPEN, UPCOMING, YEAR_ROUND
+    private String status = "AVAILABILITY_UNVERIFIED"; // OPEN, CLOSING_SOON, CLOSED, NOT_YET_OPEN, UPCOMING, YEAR_ROUND, AVAILABILITY_UNVERIFIED
 
     @Column(name = "application_open_date")
     private java.time.LocalDate applicationOpenDate;

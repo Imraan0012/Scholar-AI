@@ -57,6 +57,7 @@ public class UniversityPortalConnector implements ScholarshipSourceConnector {
         u1.put("source_reliability", "LEVEL_1_OFFICIAL_GOVT");
         u1.put("verification_status", "VERIFIED");
         u1.put("official_scheme_id", "IITB_INST_MCM_2026");
+        u1.put("status", "AVAILABILITY_UNVERIFIED");
         list.add(u1);
 
         // 2. IISc Bangalore Undergraduate & PG Research Fellowship
@@ -80,6 +81,7 @@ public class UniversityPortalConnector implements ScholarshipSourceConnector {
         u2.put("source_reliability", "LEVEL_1_OFFICIAL_GOVT");
         u2.put("verification_status", "VERIFIED");
         u2.put("official_scheme_id", "IISC_RESEARCH_FELLOWSHIP_2026");
+        u2.put("status", "AVAILABILITY_UNVERIFIED");
         list.add(u2);
 
         // 3. IIT Madras Free Education and Merit Scholarship Scheme
@@ -103,6 +105,7 @@ public class UniversityPortalConnector implements ScholarshipSourceConnector {
         u3.put("source_reliability", "LEVEL_1_OFFICIAL_GOVT");
         u3.put("verification_status", "VERIFIED");
         u3.put("official_scheme_id", "IITM_MCM_FEES_2026");
+        u3.put("status", "AVAILABILITY_UNVERIFIED");
         list.add(u3);
 
         log.info("[UNIVERSITY CONNECTOR] Discovered {} premier university & institute schemes.", list.size());

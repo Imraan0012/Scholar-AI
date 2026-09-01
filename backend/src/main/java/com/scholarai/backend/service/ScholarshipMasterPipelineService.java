@@ -283,13 +283,24 @@ public class ScholarshipMasterPipelineService {
             sch.setVerificationStatus("VERIFIED");
             sch.setOfficialSchemeId(officialSchemeId);
             sch.setContentHash(hash);
-            sch.setStatus("OPEN");
+
+            LocalDate openDate = parseDate(rawScheme.get("application_open_date"));
+            LocalDate deadline = parseDate(rawScheme.get("application_deadline"));
+            Boolean extended = Boolean.TRUE.equals(rawScheme.get("is_deadline_extended"));
+
+            sch.setApplicationOpenDate(openDate);
+            sch.setApplicationDeadline(deadline);
+            sch.setIsDeadlineExtended(extended);
+
+            String resolvedStatus = resolveLifecycleStatus(rawScheme, openDate, deadline);
+            sch.setStatus(resolvedStatus);
             sch.setLastVerifiedAt(OffsetDateTime.now());
             sch.setLastCheckedAt(OffsetDateTime.now());
 
             scholarshipRepository.save(sch);
             autoPublishedCount.incrementAndGet();
-            log.info("[AUTO-PUBLISHED] High-confidence official scheme published to live catalog: {} ({})", sch.getName(), sch.getId());
+            log.info("[AUTO-PUBLISHED] High-confidence official scheme published to live catalog (status: {}): {} ({})",
+                    resolvedStatus, sch.getName(), sch.getId());
         } else {
             // Stage for manual review if uncertain or candidate already exists
             candidate.setStatus("PENDING_REVIEW");
@@ -317,7 +328,8 @@ public class ScholarshipMasterPipelineService {
         return "LEVEL_1_OFFICIAL_GOVT".equalsIgnoreCase(reliability) ||
                "LEVEL_2_OFFICIAL_AGENCY".equalsIgnoreCase(reliability) ||
                "CENTRAL_GOVERNMENT".equalsIgnoreCase(connector.getCategory()) ||
-               "STATE_GOVERNMENT".equalsIgnoreCase(connector.getCategory());
+               "STATE_GOVERNMENT".equalsIgnoreCase(connector.getCategory()) ||
+               "UNIVERSITY_INSTITUTION".equalsIgnoreCase(connector.getCategory());
     }
 
     /**
@@ -375,22 +387,82 @@ public class ScholarshipMasterPipelineService {
         return stats;
     }
 
-    private String calculateDynamicStatus(Scholarship sch) {
-        if (sch == null) return "OPEN";
-        if (sch.getApplicationDeadline() != null) {
-            LocalDate today = LocalDate.now();
-            if (sch.getApplicationOpenDate() != null && today.isBefore(sch.getApplicationOpenDate())) {
+    public String resolveLifecycleStatus(Map<String, Object> payload, LocalDate openDate, LocalDate deadline) {
+        LocalDate today = LocalDate.now();
+        if (deadline != null) {
+            if (today.isAfter(deadline)) {
+                return "CLOSED";
+            }
+            if (openDate != null && today.isBefore(openDate)) {
                 return "UPCOMING";
             }
+            if (deadline.minusDays(14).isBefore(today) || deadline.isEqual(today)) {
+                return "CLOSING_SOON";
+            }
+            return "OPEN";
+        }
+
+        // When deadline is NULL, check if explicitly configured as YEAR_ROUND or explicit status
+        if (payload != null) {
+            String explicitStatus = (String) payload.get("status");
+            if ("YEAR_ROUND".equalsIgnoreCase(explicitStatus)) {
+                return "YEAR_ROUND";
+            }
+            if ("UPCOMING".equalsIgnoreCase(explicitStatus) || "NOT_YET_OPEN".equalsIgnoreCase(explicitStatus)) {
+                return "UPCOMING";
+            }
+            if ("CLOSED".equalsIgnoreCase(explicitStatus)) {
+                return "CLOSED";
+            }
+            if ("OPEN".equalsIgnoreCase(explicitStatus) && Boolean.TRUE.equals(payload.get("has_active_cycle_proof"))) {
+                return "OPEN";
+            }
+        }
+
+        // Neutral lifecycle status when dates / active cycle are unverified
+        return "AVAILABILITY_UNVERIFIED";
+    }
+
+    public String calculateDynamicStatus(Scholarship sch) {
+        if (sch == null) return "AVAILABILITY_UNVERIFIED";
+        LocalDate today = LocalDate.now();
+        if (sch.getApplicationDeadline() != null) {
             if (today.isAfter(sch.getApplicationDeadline())) {
                 return "CLOSED";
+            }
+            if (sch.getApplicationOpenDate() != null && today.isBefore(sch.getApplicationOpenDate())) {
+                return "UPCOMING";
             }
             if (sch.getApplicationDeadline().minusDays(14).isBefore(today) || sch.getApplicationDeadline().isEqual(today)) {
                 return "CLOSING_SOON";
             }
             return "OPEN";
         }
-        return sch.getStatus() != null ? sch.getStatus() : "OPEN";
+
+        // When application_deadline is NULL
+        String currentStatus = sch.getStatus();
+        if ("YEAR_ROUND".equalsIgnoreCase(currentStatus)) {
+            return "YEAR_ROUND";
+        }
+        if ("UPCOMING".equalsIgnoreCase(currentStatus) || "NOT_YET_OPEN".equalsIgnoreCase(currentStatus)) {
+            return "UPCOMING";
+        }
+        if ("CLOSED".equalsIgnoreCase(currentStatus)) {
+            return "CLOSED";
+        }
+
+        // If previously marked OPEN solely due to null deadline without proof, correct to AVAILABILITY_UNVERIFIED
+        return "AVAILABILITY_UNVERIFIED";
+    }
+
+    private LocalDate parseDate(Object val) {
+        if (val == null) return null;
+        if (val instanceof LocalDate) return (LocalDate) val;
+        try {
+            return LocalDate.parse(val.toString().trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public List<ScholarshipScanRun> getRecentScanRuns() {

@@ -394,6 +394,18 @@ public class ScholarshipDiscoveryService {
             sch.setVerificationStatus("VERIFIED");
             sch.setOfficialSchemeId(candidate.getExternalSchemeId());
             sch.setContentHash(candidate.getContentHash());
+
+            java.time.LocalDate openDate = parseDate(payload.get("application_open_date"));
+            java.time.LocalDate deadline = parseDate(payload.get("application_deadline"));
+            Boolean extended = Boolean.TRUE.equals(payload.get("is_deadline_extended"));
+
+            sch.setApplicationOpenDate(openDate);
+            sch.setApplicationDeadline(deadline);
+            sch.setIsDeadlineExtended(extended);
+
+            String resolvedStatus = resolveLifecycleStatus(payload, openDate, deadline);
+            sch.setStatus(resolvedStatus);
+
             sch.setLastVerifiedAt(OffsetDateTime.now());
             sch.setLastCheckedAt(OffsetDateTime.now());
             sch.setCreatedAt(OffsetDateTime.now());
@@ -579,5 +591,49 @@ public class ScholarshipDiscoveryService {
         report.put("totalPublishedScholarships", scholarshipRepository.count());
         report.put("pendingDiscoveryCandidates", candidateRepository.countByStatus("PENDING_REVIEW"));
         return report;
+    }
+
+    public String resolveLifecycleStatus(Map<String, Object> payload, java.time.LocalDate openDate, java.time.LocalDate deadline) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        if (deadline != null) {
+            if (today.isAfter(deadline)) {
+                return "CLOSED";
+            }
+            if (openDate != null && today.isBefore(openDate)) {
+                return "UPCOMING";
+            }
+            if (deadline.minusDays(14).isBefore(today) || deadline.isEqual(today)) {
+                return "CLOSING_SOON";
+            }
+            return "OPEN";
+        }
+
+        if (payload != null) {
+            String explicitStatus = (String) payload.get("status");
+            if ("YEAR_ROUND".equalsIgnoreCase(explicitStatus)) {
+                return "YEAR_ROUND";
+            }
+            if ("UPCOMING".equalsIgnoreCase(explicitStatus) || "NOT_YET_OPEN".equalsIgnoreCase(explicitStatus)) {
+                return "UPCOMING";
+            }
+            if ("CLOSED".equalsIgnoreCase(explicitStatus)) {
+                return "CLOSED";
+            }
+            if ("OPEN".equalsIgnoreCase(explicitStatus) && Boolean.TRUE.equals(payload.get("has_active_cycle_proof"))) {
+                return "OPEN";
+            }
+        }
+
+        return "AVAILABILITY_UNVERIFIED";
+    }
+
+    private java.time.LocalDate parseDate(Object val) {
+        if (val == null) return null;
+        if (val instanceof java.time.LocalDate) return (java.time.LocalDate) val;
+        try {
+            return java.time.LocalDate.parse(val.toString().trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

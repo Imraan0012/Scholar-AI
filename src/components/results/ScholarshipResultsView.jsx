@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudentProfile } from '../../context/StudentProfileContext';
+import { calculateDeadlineStatus } from '../../engine/eligibilityEngine';
 import ScholarshipDetailModal from './ScholarshipDetailModal';
 import {
   Check,
@@ -41,8 +42,14 @@ const getScholarshipLogo = (scholarship) => {
   return '/scholarships/emblem_india.svg';
 };
 
-const formatDeadline = (dateStr) => {
-  if (!dateStr) return '31 Oct 2026';
+const formatDeadline = (dateStr, status) => {
+  if (!dateStr) {
+    if (status === 'YEAR_ROUND') return 'Year-Round / Rolling';
+    if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Availability Unverified';
+    if (status === 'UPCOMING') return 'Upcoming Cycle';
+    if (status === 'CLOSED') return 'Applications Closed';
+    return 'Refer Official Portal';
+  }
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -486,9 +493,11 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
               {filteredScholarships.map((item) => {
                 const { scholarship, matchScore, isEligible, tier, evaluations } = item;
                 const isPossible = tier === 'POSSIBLE_MATCH';
-                const isSaved = isBookmarked(scholarship.id);
-                const logoSrc = getScholarshipLogo(scholarship);
-                const formattedDeadline = formatDeadline(scholarship.application_deadline);
+                const rawStatus = scholarship.status;
+                const deadline = scholarship.application_deadline || scholarship.applicationDeadline;
+                const openDate = scholarship.application_open_date || scholarship.applicationOpenDate || scholarship.application_start;
+                const lifecycleStatus = calculateDeadlineStatus(deadline, openDate, rawStatus);
+                const formattedDeadline = formatDeadline(deadline, lifecycleStatus);
 
                 const categoryPill = scholarship.government_level === 'CENTRAL'
                   ? { label: 'Government (Central)', bg: 'bg-[#EFF6FF]', text: 'text-[#2563EB]' }
@@ -626,8 +635,20 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
                       {(() => {
                         const { applicationUrl, websiteUrl } = getScholarshipUrls(scholarship);
                         const targetUrl = applicationUrl || websiteUrl;
-                        const buttonText = applicationUrl ? 'Apply Now' : websiteUrl ? 'View Official Website' : 'Application Link Unavailable';
+                        let buttonText = 'Apply Now';
                         const isLinkDisabled = !targetUrl;
+
+                        if (lifecycleStatus === 'CLOSED') {
+                          buttonText = 'Closed';
+                        } else if (lifecycleStatus === 'UPCOMING' || lifecycleStatus === 'NOT_YET_OPEN') {
+                          buttonText = 'Upcoming';
+                        } else if (lifecycleStatus === 'AVAILABILITY_UNVERIFIED' || lifecycleStatus === 'UNKNOWN') {
+                          buttonText = 'Check Official Website';
+                        } else if (lifecycleStatus === 'YEAR_ROUND') {
+                          buttonText = 'Apply (Year-Round)';
+                        } else {
+                          buttonText = applicationUrl ? 'Apply Now' : (websiteUrl ? 'Check Official Website' : 'Link Unavailable');
+                        }
 
                         return (
                           <button

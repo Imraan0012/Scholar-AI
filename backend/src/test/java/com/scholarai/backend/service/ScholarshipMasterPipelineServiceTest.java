@@ -119,7 +119,47 @@ public class ScholarshipMasterPipelineServiceTest {
         Scholarship published = schCaptor.getValue();
         assertEquals("new-official-scheme-2026", published.getId());
         assertEquals("Prime Minister National Research Fellowship 2026", published.getName());
-        assertEquals("OPEN", published.getStatus());
+        assertEquals("AVAILABILITY_UNVERIFIED", published.getStatus());
+    }
+
+    @Test
+    @DisplayName("Lifecycle Resolution: Verifies that null dates produce AVAILABILITY_UNVERIFIED, active dates produce OPEN, future dates produce UPCOMING, and passed dates produce CLOSED")
+    void testLifecycleResolutionRules() {
+        LocalDate today = LocalDate.now();
+
+        // 1. Null dates -> AVAILABILITY_UNVERIFIED
+        String statusNull = masterPipelineService.resolveLifecycleStatus(Map.of(), null, null);
+        assertEquals("AVAILABILITY_UNVERIFIED", statusNull);
+
+        // 2. Active dates -> OPEN
+        String statusActive = masterPipelineService.resolveLifecycleStatus(
+                Map.of(), today.minusDays(10), today.plusDays(30)
+        );
+        assertEquals("OPEN", statusActive);
+
+        // 3. Expired deadline -> CLOSED
+        String statusExpired = masterPipelineService.resolveLifecycleStatus(
+                Map.of(), today.minusMonths(2), today.minusDays(1)
+        );
+        assertEquals("CLOSED", statusExpired);
+
+        // 4. Future opening date -> UPCOMING
+        String statusFuture = masterPipelineService.resolveLifecycleStatus(
+                Map.of(), today.plusDays(10), today.plusDays(40)
+        );
+        assertEquals("UPCOMING", statusFuture);
+
+        // 5. Closing soon (<= 14 days) -> CLOSING_SOON
+        String statusClosingSoon = masterPipelineService.resolveLifecycleStatus(
+                Map.of(), today.minusDays(20), today.plusDays(5)
+        );
+        assertEquals("CLOSING_SOON", statusClosingSoon);
+
+        // 6. Explicit YEAR_ROUND with null dates -> YEAR_ROUND
+        String statusYearRound = masterPipelineService.resolveLifecycleStatus(
+                Map.of("status", "YEAR_ROUND"), null, null
+        );
+        assertEquals("YEAR_ROUND", statusYearRound);
     }
 
     @Test
