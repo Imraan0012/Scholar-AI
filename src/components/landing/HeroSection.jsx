@@ -88,7 +88,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Clear Domain-Specific Supporting Text */}
         <motion.p
           variants={itemVariants}
-          className="mt-3.5 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
+          className="mt-3.5 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-[1.9] drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
         >
           Tell us about your education, family income, category and State of Residence. Scholar AI checks scholarship requirements and shows the schemes that match your profile.
         </motion.p>
