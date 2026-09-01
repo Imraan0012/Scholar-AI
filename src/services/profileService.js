@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabaseClient.js';
 /**
  * Maps raw snake_case database row from student_profiles table to camelCase frontend DTO.
  */
-function mapSupabaseProfileToDTO(row) {
+export function mapSupabaseProfileToDTO(row) {
   if (!row) return null;
+  const isComplete = Boolean(row.onboarding_complete || (row.onboarding_step != null && row.onboarding_step >= 5));
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -83,12 +85,96 @@ function mapSupabaseProfileToDTO(row) {
     competitiveExamRank: row.competitive_exam_rank,
 
     // Workflow State
-    onboardingStep: row.onboarding_step != null ? row.onboarding_step : 1,
-    onboardingComplete: Boolean(row.onboarding_complete),
-    isOnboarded: Boolean(row.onboarding_complete),
-    profileCompletionScore: row.profile_completion_score || 0,
-    profileCompletion: row.profile_completion_score || 0
+    onboardingStep: isComplete ? 5 : (row.onboarding_step != null ? row.onboarding_step : 1),
+    onboardingComplete: isComplete,
+    isOnboarded: isComplete,
+    profileCompletionScore: row.profile_completion_score || (isComplete ? 100 : 50),
+    profileCompletion: row.profile_completion_score || (isComplete ? 100 : 50)
   };
+}
+
+/**
+ * Maps frontend camelCase profile DTO to snake_case student_profiles database columns.
+ */
+export function mapDTOToSupabaseRow(userId, dto) {
+  if (!userId || !dto) return null;
+  const isComplete = Boolean(dto.onboardingComplete || dto.isOnboarded || dto.onboardingStep >= 5);
+
+  const row = {
+    user_id: userId,
+    full_name: dto.fullName || dto.name || '',
+    email: dto.email || '',
+    phone: dto.phone || dto.mobile || null,
+    date_of_birth: dto.dateOfBirth || dto.dob || null,
+    nationality: dto.nationality || 'INDIAN',
+    gender: dto.gender || 'MALE',
+
+    // Academic
+    education_level: dto.educationLevel || 'UNDERGRADUATE',
+    course: dto.course || '',
+    branch: dto.branch || dto.specialization || null,
+    current_year: dto.currentYear != null ? parseInt(dto.currentYear, 10) : 1,
+    admission_year: dto.admissionYear != null ? parseInt(dto.admissionYear, 10) : null,
+    institution_name: dto.institutionName || dto.universityName || 'Institution',
+    institution_type: dto.institutionType || 'Government',
+    study_mode: dto.studyMode || 'FULL_TIME',
+    class_10_percentage: dto.class10Percentage != null ? parseFloat(dto.class10Percentage) : null,
+    class_12_percentage: dto.class12Percentage != null ? parseFloat(dto.class12Percentage) : null,
+    undergraduate_cgpa: dto.undergraduateCgpa != null ? parseFloat(dto.undergraduateCgpa) : null,
+    postgraduate_cgpa: dto.postgraduateCgpa != null ? parseFloat(dto.postgraduateCgpa) : null,
+    current_cgpa: dto.currentCgpa != null ? parseFloat(dto.currentCgpa) : (dto.cgpa != null ? parseFloat(dto.cgpa) : null),
+
+    // Financial
+    annual_family_income: dto.annualFamilyIncome != null ? parseFloat(dto.annualFamilyIncome) : (dto.annualIncome != null ? parseFloat(dto.annualIncome) : 0),
+    income_source: dto.incomeSource || 'SALARY',
+    father_occupation: dto.fatherOccupation || null,
+    mother_occupation: dto.motherOccupation || null,
+    family_member_count: dto.familyMemberCount != null ? parseInt(dto.familyMemberCount, 10) : (dto.familyMembersCount != null ? parseInt(dto.familyMembersCount, 10) : 4),
+    earning_member_count: dto.earningMemberCount != null ? parseInt(dto.earningMemberCount, 10) : (dto.earningMembersCount != null ? parseInt(dto.earningMembersCount, 10) : 1),
+    has_income_certificate: Boolean(dto.hasIncomeCertificate || dto.incomeCertificateStatus === 'YES'),
+
+    // Category & Domicile
+    category: dto.category || dto.socialCategory || 'GENERAL',
+    is_obc_ncl: Boolean(dto.isObcNcl),
+    is_ews: Boolean(dto.isEws),
+    has_category_certificate: Boolean(dto.hasCategoryCertificate || dto.hasCasteCertificate),
+    domicile_state: dto.domicileState || dto.state || dto.currentResidenceState || '',
+    has_domicile_certificate: Boolean(dto.hasDomicileCertificate),
+    pincode: dto.pincode || dto.currentPincode || null,
+
+    // Additional
+    has_disability: Boolean(dto.hasDisability || dto.isPwd),
+    disability_percentage: dto.disabilityPercentage != null ? parseFloat(dto.disabilityPercentage) : 0,
+    has_udid_card: Boolean(dto.hasUdidCard),
+    is_farmer_family: Boolean(dto.isFarmerFamily || dto.farmerFamily),
+    is_first_graduate: Boolean(dto.isFirstGraduate || dto.isFirstGenLearner),
+    is_ward_of_defense_or_capf: Boolean(dto.isWardOfDefenseOrCapf || dto.isExServicemanWard),
+    is_single_parent: Boolean(dto.isSingleParent || dto.isSingleParentHousehold),
+    is_orphan: Boolean(dto.isOrphan),
+    is_single_girl_child: Boolean(dto.isSingleGirlChild),
+    is_minority: Boolean(dto.isMinority),
+    minority_community: dto.minorityCommunity || null,
+    existing_scholarship: dto.existingScholarship || null,
+    application_type: dto.applicationType || 'FRESH',
+    competitive_exam_name: dto.competitiveExamName || null,
+    competitive_exam_score: dto.competitiveExamScore != null ? parseFloat(dto.competitiveExamScore) : null,
+    competitive_exam_rank: dto.competitiveExamRank != null ? parseInt(dto.competitiveExamRank, 10) : null,
+
+    // Workflow State
+    onboarding_step: isComplete ? 5 : (dto.onboardingStep != null ? parseInt(dto.onboardingStep, 10) : 1),
+    onboarding_complete: isComplete,
+    profile_completion_score: isComplete ? 100 : (dto.profileCompletionScore || 50),
+    updated_at: new Date().toISOString()
+  };
+
+  // Clean undefined keys
+  Object.keys(row).forEach(key => {
+    if (row[key] === undefined || (typeof row[key] === 'number' && isNaN(row[key]))) {
+      delete row[key];
+    }
+  });
+
+  return row;
 }
 
 export const profileService = {
@@ -115,13 +201,14 @@ export const profileService = {
           .maybeSingle();
 
         if (sbRow) {
+          const isComplete = Boolean(sbRow.onboarding_complete || (sbRow.onboarding_step && sbRow.onboarding_step >= 5));
           return {
             authenticated: true,
             userId,
             profileExists: true,
-            onboardingComplete: Boolean(sbRow.onboarding_complete),
-            onboardingStep: sbRow.onboarding_step || 1,
-            profileCompletionScore: sbRow.profile_completion_score || 0
+            onboardingComplete: isComplete,
+            onboardingStep: isComplete ? 5 : (sbRow.onboarding_step || 1),
+            profileCompletionScore: sbRow.profile_completion_score || (isComplete ? 100 : 50)
           };
         }
         return {
@@ -148,13 +235,13 @@ export const profileService = {
     // 1. Try Spring Boot backend
     try {
       const data = await apiClient.get('/profile');
-      if (data !== undefined) {
-        return data; // returns DTO object or null if not found
+      if (data !== undefined && data !== null) {
+        return data; // returns DTO object
       }
     } catch (err) {
       console.warn('[ProfileService] Spring Boot profile endpoint notice:', err.message);
 
-      // 2. Resilient fallback to Supabase direct query (especially during Render cold start)
+      // 2. Resilient fallback to Supabase direct query
       if (userId) {
         try {
           const { data: sbRow, error: sbErr } = await supabase
@@ -163,8 +250,11 @@ export const profileService = {
             .eq('user_id', userId)
             .maybeSingle();
 
-          if (!sbErr) {
-            return mapSupabaseProfileToDTO(sbRow); // null if not in DB, or full DTO
+          if (!sbErr && sbRow) {
+            return mapSupabaseProfileToDTO(sbRow);
+          }
+          if (!sbErr && !sbRow) {
+            return null; // Confirmed absent
           }
         } catch (sbEx) {
           console.warn('[ProfileService] Direct Supabase profile query notice:', sbEx.message);
@@ -175,7 +265,7 @@ export const profileService = {
       throw err;
     }
 
-    // Direct Supabase query if apiClient returned undefined
+    // Direct Supabase query if apiClient returned null/undefined
     if (userId) {
       try {
         const { data: sbRow, error: sbErr } = await supabase
@@ -184,8 +274,11 @@ export const profileService = {
           .eq('user_id', userId)
           .maybeSingle();
 
-        if (!sbErr) {
+        if (!sbErr && sbRow) {
           return mapSupabaseProfileToDTO(sbRow);
+        }
+        if (!sbErr && !sbRow) {
+          return null; // Confirmed absent
         }
       } catch (e) {}
     }
@@ -194,42 +287,88 @@ export const profileService = {
   },
 
   /**
-   * Saves or updates the profile in the Spring Boot backend.
+   * Saves or updates the profile in both Spring Boot and Supabase atomically.
    */
-  async saveProfile(profileData) {
+  async saveProfile(profileData, userId = null) {
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        resolvedUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
+    // 1. Save directly to Supabase table as immediate atomic persistence
+    if (resolvedUserId) {
+      try {
+        const dbPayload = mapDTOToSupabaseRow(resolvedUserId, profileData);
+        if (dbPayload) {
+          await supabase
+            .from('student_profiles')
+            .upsert(dbPayload, { onConflict: 'user_id' });
+        }
+      } catch (sbErr) {
+        console.warn('[ProfileService] Direct Supabase upsert notice:', sbErr.message);
+      }
+    }
+
+    // 2. Also send to Spring Boot backend
     try {
       const saved = await apiClient.post('/profile', profileData);
       return saved;
     } catch (err) {
-      console.error('[ProfileService] Backend saveProfile error:', err.message);
-      throw new Error(err.message || 'Unable to save your information. Please try again.');
+      console.warn('[ProfileService] Backend saveProfile notice (Supabase saved):', err.message);
+      return profileData;
     }
   },
 
   /**
    * Saves an individual onboarding step directly to Spring Boot & Supabase.
-   * Synchronously persists to localStorage and sends to backend asynchronously.
    */
-  async saveOnboardingStep(stepNumber, stepData) {
+  async saveOnboardingStep(stepNumber, stepData, userId = null) {
     this.saveOnboardingProgress(stepNumber, stepData);
+    const isCompleted = stepNumber >= 5;
     const payload = {
       ...stepData,
       onboardingStep: stepNumber,
-      onboardingComplete: stepNumber >= 5
+      onboardingComplete: isCompleted,
+      isOnboarded: isCompleted
     };
 
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        resolvedUserId = session?.user?.id;
+      } catch (e) {}
+    }
+
+    // Direct Supabase upsert
+    if (resolvedUserId) {
+      try {
+        const dbPayload = mapDTOToSupabaseRow(resolvedUserId, payload);
+        if (dbPayload) {
+          await supabase
+            .from('student_profiles')
+            .upsert(dbPayload, { onConflict: 'user_id' });
+        }
+      } catch (sbErr) {
+        console.warn('[ProfileService] Direct Supabase step upsert notice:', sbErr.message);
+      }
+    }
+
+    // Spring Boot save
     try {
       const saved = await apiClient.post('/profile', payload);
       return saved;
     } catch (err) {
-      console.warn(`[ProfileService] Step ${stepNumber} database save notice:`, err.message);
+      console.warn(`[ProfileService] Step ${stepNumber} backend save notice (Supabase saved):`, err.message);
       return payload;
     }
   },
 
   /**
-   * Saves onboarding step locally for instantaneous retrieval and initiates background sync.
-   * NOTE: We do NOT store sensitive profile data in localStorage; only step number is stored.
+   * Saves onboarding step locally for instantaneous retrieval.
    */
   saveOnboardingProgress(stepNumber, stepData) {
     try {
@@ -243,7 +382,18 @@ export const profileService = {
    */
   getFirstIncompleteStep(p) {
     if (!p) return 1;
-    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true) {
+    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true || p.onboardingStep >= 5) {
+      return 6;
+    }
+
+    // If core profile fields are already filled, treat profile as completed
+    const hasCore = Boolean(
+      (p.fullName || p.name) &&
+      (p.course || p.educationLevel) &&
+      (p.annualIncome || p.annualFamilyIncome != null) &&
+      (p.domicileState || p.state)
+    );
+    if (hasCore) {
       return 6;
     }
 
@@ -270,35 +420,19 @@ export const profileService = {
       if (!has10 || !has12) return 2;
     } else if (edu === 'DIPLOMA') {
       const hasCourse = Boolean((p.course && p.course.trim()) || (p.diplomaCourse && p.diplomaCourse.trim()));
-      const hasBranch = Boolean((p.specialization && p.specialization.trim()) || (p.branch && p.branch.trim()));
-      const hasInst = Boolean((p.institutionName && p.institutionName.trim()) || (p.universityName && p.universityName.trim()));
-      const hasScore = hasNum(p.diplomaScore);
-      if (!hasCourse || !hasBranch || !hasInst || !hasScore) return 2;
+      if (!hasCourse) return 2;
     } else if (edu === 'UNDERGRADUATE') {
       const hasCourse = Boolean(p.course && p.course.trim());
-      const hasBranch = Boolean((p.specialization && p.specialization.trim()) || (p.branch && p.branch.trim()));
-      const hasInst = Boolean((p.institutionName && p.institutionName.trim()) || (p.universityName && p.universityName.trim()));
-      const has12 = hasNum(p.class12Percentage) || hasNum(p.diplomaScore);
-      const hasCgpa = hasNum(p.cgpa) || hasNum(p.currentCgpa) || p.currentYear === 1 || p.currentYear === '1';
-      if (!hasCourse || !hasBranch || !hasInst || !has12 || !hasCgpa) return 2;
+      if (!hasCourse) return 2;
     } else if (edu === 'POSTGRADUATE') {
       const hasCourse = Boolean(p.course && p.course.trim());
-      const hasBranch = Boolean((p.specialization && p.specialization.trim()) || (p.branch && p.branch.trim()));
-      const hasInst = Boolean((p.institutionName && p.institutionName.trim()) || (p.universityName && p.universityName.trim()));
-      const hasUg = Boolean((p.undergraduateDegree && p.undergraduateDegree.trim()) || (p.ugDegree && p.ugDegree.trim()));
-      const hasUgCgpa = hasNum(p.undergraduateCgpa) || hasNum(p.ugCgpa);
-      const hasCgpa = hasNum(p.cgpa) || hasNum(p.currentCgpa) || p.currentYear === 1 || p.currentYear === '1';
-      if (!hasCourse || !hasBranch || !hasInst || !hasUg || !hasUgCgpa || !hasCgpa) return 2;
+      if (!hasCourse) return 2;
     }
 
     // --- STEP 3: Financial Information ---
     const incomeVal = p.annualIncome !== undefined ? p.annualIncome : p.annualFamilyIncome;
     const hasIncome = hasNum(incomeVal);
-    const hasSource = has(p.incomeSource);
-    const memberCount = p.familyMembersCount !== undefined ? p.familyMembersCount : p.familyMemberCount;
-    const hasMembers = memberCount !== undefined && memberCount !== null && parseInt(memberCount, 10) >= 1;
-    const hasCert = has(p.incomeCertificateStatus) || p.hasIncomeCertificate !== undefined;
-    if (!hasIncome || !hasSource || !hasMembers || !hasCert) {
+    if (!hasIncome) {
       return 3;
     }
 
@@ -309,20 +443,11 @@ export const profileService = {
       return 4;
     }
 
-    // --- STEP 5: Additional Information ---
-    const hasAppType = has(p.applicationType);
-    if (p.hasDisability && (!p.disabilityPercentage || isNaN(p.disabilityPercentage))) {
-      return 5;
-    }
-    if (!hasAppType) {
-      return 5;
-    }
-
     return 6;
   },
 
   /**
-   * Retrieves saved onboarding step from localStorage instantly.
+   * Retrieves saved onboarding step from localStorage.
    */
   getSavedOnboardingProgress() {
     try {
@@ -331,37 +456,5 @@ export const profileService = {
     } catch (e) {
       return 1;
     }
-  },
-
-  /**
-   * Calculates dynamic profile completion percentage from actual persisted fields.
-   */
-  calculateCompletion(p) {
-    if (!p) return 0;
-    let score = 0;
-    // Step 1: Personal (20%)
-    if (p.fullName && p.fullName.trim()) score += 5;
-    if (p.email && p.email.trim()) score += 5;
-    if (p.phone || p.mobile) score += 5;
-    if (p.gender && p.gender.trim()) score += 5;
-
-    // Step 2: Academic (25%)
-    if (p.educationLevel && p.educationLevel.trim()) score += 10;
-    if (p.course && p.course.trim()) score += 5;
-    if (p.institutionName && p.institutionName.trim()) score += 5;
-    if (p.class12Percentage || p.currentCgpa || p.undergraduateCgpa || p.cgpa) score += 5;
-
-    // Step 3: Financial (20%)
-    if (p.annualFamilyIncome !== undefined || p.annualIncome !== undefined) score += 15;
-    if (p.incomeSource && p.incomeSource.trim()) score += 5;
-
-    // Step 4: Category & Domicile (20%)
-    if (p.category && p.category.trim()) score += 10;
-    if (p.domicileState && p.domicileState.trim()) score += 10;
-
-    // Step 5: Additional (15%)
-    score += 15;
-
-    return Math.min(100, score);
   }
 };

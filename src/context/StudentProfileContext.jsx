@@ -9,121 +9,102 @@ import { MASTER_SCHOLARSHIP_REGISTRY } from '../data/scholarships/index';
 
 const StudentProfileContext = createContext();
 
-export const createEmptyProfile = (user = null) => {
+// ─── Default clean student profile template ──────────────────────────────────
+export function createEmptyProfile(user = null) {
   const meta = user?.user_metadata || {};
   const fullName = meta.full_name || meta.name || user?.name || '';
   const email = user?.email || '';
 
   return {
+    id: null,
+    userId: user?.id || null,
     fullName,
-    dob: '',
-    gender: '',
-    nationality: 'INDIAN',
-    mobile: '',
     email,
-    isAadhaarVerified: false,
+    phone: meta.phone || user?.phone || '',
+    mobile: meta.phone || user?.phone || '',
+    dateOfBirth: '',
+    dob: '',
+    nationality: 'INDIAN',
+    gender: 'MALE',
+
+    // Academic Background
     educationLevel: 'UNDERGRADUATE',
     course: '',
+    branch: '',
     specialization: '',
-    studyMode: '',
-    courseType: 'FULL_TIME',
-    currentYear: '',
-    currentSemester: 1,
-    admissionYear: '',
-    intendedAdmissionYear: '',
-    expectedGraduationYear: '',
+    currentYear: 1,
+    admissionYear: new Date().getFullYear(),
     institutionName: '',
-    universityName: '',
-    institutionType: '',
-    institutionState: '',
-    institutionDistrict: '',
-    isHosteller: false,
-    class10Board: 'CBSE',
-    class10PassingYear: 2020,
+    institutionType: 'Government',
+    studyMode: 'FULL_TIME',
     class10Percentage: '',
-    class10School: '',
-    class12Board: 'State Board',
-    class12Stream: 'Science',
-    class12PassingYear: 2022,
     class12Percentage: '',
-    class12School: '',
-    diplomaCourse: '',
-    diplomaScore: '',
-    undergraduateDegree: '',
     undergraduateCgpa: '',
-    pgCourse: '',
-    pgCgpa: '',
-    hasDiploma: false,
+    postgraduateCgpa: '',
+    currentCgpa: '',
     cgpa: '',
-    hasBacklogs: false,
-    familyMembersCount: '',
-    earningMembersCount: '',
-    dependentSiblingsCount: '',
+
+    // Financial Information
+    annualFamilyIncome: '',
+    annualIncome: '',
+    incomeSource: 'SALARY',
     fatherOccupation: '',
     motherOccupation: '',
-    annualIncome: '',
-    annualFamilyIncome: '',
-    incomeSource: '',
+    familyMemberCount: 4,
+    familyMembersCount: 4,
+    earningMemberCount: 1,
+    earningMembersCount: 1,
     hasIncomeCertificate: false,
-    incomeCertificateStatus: '',
-    incomeCertIssuedBy: '',
-    incomeCertIssueDate: '',
-    category: '',
-    obcNclStatus: '',
-    obcCertStatus: '',
-    ewsCertStatus: '',
-    categoryCertStatus: '',
-    casteCertStatus: '',
+    incomeCertificateStatus: 'NO',
+
+    // Category & Domicile
+    category: 'GENERAL',
+    socialCategory: 'GENERAL',
+    isObcNcl: false,
+    isEws: false,
+    hasCategoryCertificate: false,
+    hasCasteCertificate: false,
+    domicileState: '',
+    state: '',
+    hasDomicileCertificate: false,
+    pincode: '',
+    currentPincode: '',
+
+    // Additional Information
+    hasDisability: false,
+    isPwd: false,
+    disabilityPercentage: 0,
+    hasUdidCard: false,
+    isFarmerFamily: false,
+    farmerFamily: false,
+    isFirstGraduate: false,
+    isFirstGenLearner: false,
+    isWardOfDefenseOrCapf: false,
+    isExServicemanWard: false,
+    isSingleParent: false,
+    isSingleParentHousehold: false,
+    isOrphan: false,
+    isSingleGirlChild: false,
     isMinority: false,
     minorityCommunity: '',
-    minorityDocStatus: 'NOT_APPLICABLE',
-    hasCasteCertificate: false,
-    hasEwsCertificate: false,
-    currentResidenceState: '',
-    currentResidenceDistrict: '',
-    currentPincode: '',
-    domicileState: '',
-    domicileDistrict: '',
-    domicileCertStatus: '',
-    hasDomicileCertificate: false,
-    hasDisability: false,
-    disabilityPercentage: '',
-    disabilityCertStatus: '',
-    isOrphan: false,
-    orphanDocStatus: '',
-    isSingleParentHousehold: false,
-    isExServicemanWard: false,
-    exServicemanServiceStatus: '',
-    exServicemanDocStatus: '',
-    isSingleGirlChild: false,
-    singleGirlChildProofStatus: '',
-    isFarmerFamily: false,
-    isFirstGenLearner: false,
-    isCurrentlyReceivingScholarship: false,
-    currentScholarshipName: '',
-    currentScholarshipProvider: '',
-    previouslyReceivedScholarship: false,
-    applicationType: '',
-    uploadedDocumentIds: [],
+    existingScholarship: '',
+    applicationType: 'FRESH',
+    competitiveExamName: '',
+    competitiveExamScore: '',
+    competitiveExamRank: '',
+
+    // Workflow State
     isOnboarded: false,
     onboardingComplete: false,
     onboardingStep: 1,
-    preferences: {
-      types: ['TUITION_FEE', 'MONTHLY_STIPEND', 'HOSTEL'],
-      minAmount: 10000
-    }
+    profileCompletionScore: 0,
+    profileCompletion: 0,
+    documentStatuses: {},
+    uploadedFiles: {}
   };
-};
-
-// ─── Safe localStorage helpers ────────────────────────────────────────────────
-function readProfileHint() {
-  try {
-    const raw = localStorage.getItem('scholar_ai_profile_hint');
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return null;
 }
 
+// Lightweight hint storage to prevent screen flash on reload
 function writeProfileHint(profileExists, onboardingCompleted) {
   try {
     localStorage.setItem('scholar_ai_profile_hint', JSON.stringify({
@@ -151,20 +132,24 @@ export const StudentProfileProvider = ({ children }) => {
 
   // ── Granular loading & status states ─────────────────────────────────────────
   // authLoading: true only while Supabase resolves the session (~200 ms).
-  //   The full-screen loader in App.jsx is gated on this.
   const [authLoading, setAuthLoading] = useState(true);
   // profileLoading: true while Spring Boot /api/profile or Supabase is in-flight.
-  //   Never blocks the whole app — only shows skeletons inside profile sections.
   const [profileLoading, setProfileLoading] = useState(false);
+  // profileRefreshing: true during background silent syncs.
+  const [profileRefreshing, setProfileRefreshing] = useState(false);
   // profileStatus: 'unauthenticated' | 'loading' | 'loaded' | 'not_found' | 'error'
-  //   Guarantees route guards ONLY redirect on confirmed 'not_found' in DB.
   const [profileStatus, setProfileStatus] = useState('unauthenticated');
   // profileError: message string when backend failed/timed out; null otherwise.
   const [profileError, setProfileError] = useState(null);
 
   // ── Initialization guard ─────────────────────────────────────────────────────
-  // Prevents React StrictMode double-invocation from running initSession twice.
   const initStarted = useRef(false);
+
+  // ── Ref to track latest profile synchronously for race-free background syncs ──
+  const profileRef = useRef(profile);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   // ── Scholarship loader (non-blocking) ────────────────────────────────────────
   const loadScholarshipsAsync = useCallback(() => {
@@ -178,24 +163,27 @@ export const StudentProfileProvider = ({ children }) => {
   }, []);
 
   // ── Profile + auxiliary data loader ─────────────────────────────────────────
-  const loadUserData = useCallback(async (user, { isRetry = false } = {}) => {
+  const loadUserData = useCallback(async (user, { isRetry = false, isBackground = false } = {}) => {
     if (!user?.id) {
       setProfile(createEmptyProfile(null));
       setProfileStatus('unauthenticated');
       setProfileLoading(false);
+      setProfileRefreshing(false);
       setBookmarks([]);
       setSavedApplications([]);
       setNotifications([]);
       return;
     }
 
-    setProfileLoading(true);
-    setProfileStatus('loading');
-    if (!isRetry) setProfileError(null);
+    if (isBackground) {
+      setProfileRefreshing(true);
+    } else {
+      setProfileLoading(true);
+      setProfileStatus('loading');
+      if (!isRetry) setProfileError(null);
+    }
 
     try {
-      // Profile fetch — tries Spring Boot API first, falls back directly to Supabase on cold start.
-      // Bookmarks / apps / notifs run in parallel.
       const [userProfile, userBookmarks, userApps, userNotifs] = await Promise.all([
         profileService.getProfile(user.id).catch((err) => {
           throw err;
@@ -207,17 +195,19 @@ export const StudentProfileProvider = ({ children }) => {
 
       const empty = createEmptyProfile(user);
 
-      if (userProfile && (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course || userProfile.onboardingComplete)) {
+      if (userProfile && (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course || userProfile.onboardingComplete || userProfile.annualFamilyIncome != null)) {
         const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
-        const isCompleted = Boolean(userProfile.onboardingComplete || userProfile.isOnboarded) || firstIncomplete === 6;
-        const step = isCompleted ? 6 : firstIncomplete;
+        // If current in-memory session was already completed, do NOT downgrade to incomplete
+        const prevCompleted = Boolean(profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded);
+        const isCompleted = prevCompleted || Boolean(userProfile.onboardingComplete || userProfile.isOnboarded || userProfile.onboarding_complete || userProfile.onboardingStep >= 5) || firstIncomplete === 6;
+        const step = isCompleted ? 5 : Math.min(5, Math.max(1, firstIncomplete));
 
         const cleanProfile = {
           ...empty,
           ...userProfile,
           isOnboarded: isCompleted,
           onboardingComplete: isCompleted,
-          onboardingStep: isCompleted ? 5 : Math.min(5, Math.max(1, step))
+          onboardingStep: step
         };
 
         setProfile(cleanProfile);
@@ -229,30 +219,39 @@ export const StudentProfileProvider = ({ children }) => {
           localStorage.setItem('scholar_ai_onboarding_step', String(step));
         } catch (e) {}
       } else {
-        // Profile confirmed absent in database
-        setProfile(empty);
-        setProfileStatus('not_found');
-        setProfileError(null);
-        writeProfileHint(false, false);
+        // If we already have a loaded, completed profile in memory, do NOT downgrade to not_found on empty background sync
+        if (profileRef.current?.id && (profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded)) {
+          console.log('[StudentProfileContext] Retaining existing in-memory completed profile despite empty background response');
+          setProfileStatus('loaded');
+        } else {
+          setProfile(empty);
+          setProfileStatus('not_found');
+          setProfileError(null);
+          writeProfileHint(false, false);
+        }
       }
 
       setBookmarks(Array.isArray(userBookmarks) ? userBookmarks : []);
       setSavedApplications(Array.isArray(userApps) ? userApps : []);
       setNotifications(Array.isArray(userNotifs) ? userNotifs : []);
     } catch (err) {
-      // DO NOT mark not_found on error or timeout!
-      setProfileStatus('error');
+      console.warn('[StudentProfileContext] loadUserData notice:', err.message);
+
+      // If we already have a loaded profile in memory, NEVER change profileStatus to error or not_found!
+      if (profileRef.current?.id || profileRef.current?.onboardingComplete || profileRef.current?.course) {
+        setProfileStatus('loaded');
+      } else {
+        setProfileStatus('error');
+      }
+
       const isTimeout = err?.isTimeout === true || err?.status === 408;
       const msg = isTimeout
         ? 'Server is waking up — click Retry in a moment.'
         : 'Could not connect to profile service. Click Retry.';
       setProfileError(msg);
-
-      console.warn('[StudentProfileContext] loadUserData notice:', err.message);
-      // Do NOT sign the user out or clear their session on profile failure.
-      // Do NOT redirect to onboarding on timeout or transient error.
     } finally {
       setProfileLoading(false);
+      setProfileRefreshing(false);
     }
   }, []);
 
@@ -265,16 +264,12 @@ export const StudentProfileProvider = ({ children }) => {
 
   // ── Main initialization effect ───────────────────────────────────────────────
   useEffect(() => {
-    // Guard against React StrictMode double-invoke
     if (initStarted.current) return;
     initStarted.current = true;
 
     let mounted = true;
 
     async function initSession() {
-      // ── Phase 1: Resolve Supabase session ───────────────────────────────────
-      // This is the ONLY thing that holds the full-screen loader.
-      // Supabase reads from localStorage — should resolve in < 200 ms.
       let user = null;
       try {
         user = await authService.getCurrentUser();
@@ -296,10 +291,8 @@ export const StudentProfileProvider = ({ children }) => {
         setNotifications([]);
       }
 
-      // ── Phase 2: App is now unblocked — clear authLoading ───────────────────
       setAuthLoading(false);
 
-      // ── Phase 3: Non-blocking background fetches ─────────────────────────────
       if (user) {
         loadUserData(user);
         loadScholarshipsAsync();
@@ -312,10 +305,9 @@ export const StudentProfileProvider = ({ children }) => {
     const unsubscribeAuth = authService.onAuthStateChange(async (event, user) => {
       if (!mounted) return;
 
-      // INITIAL_SESSION is handled by initSession — ignore to prevent duplicate fetch
       if (event === 'INITIAL_SESSION') return;
 
-      // TOKEN_REFRESHED: keep existing profile intact, do NOT reset status
+      // TOKEN_REFRESHED: maintain existing profile intact, do NOT reset status or trigger destructive redirects
       if (event === 'TOKEN_REFRESHED') {
         if (user) setCurrentUser(user);
         return;
@@ -324,8 +316,14 @@ export const StudentProfileProvider = ({ children }) => {
       if (event === 'SIGNED_IN' || (event === 'USER_UPDATED' && user)) {
         if (user) {
           setCurrentUser(user);
-          setProfileStatus('loading');
-          loadUserData(user);
+          // If we already have this user's profile loaded and marked complete in memory, perform silent background sync
+          const currentProfile = profileRef.current;
+          if (currentProfile?.userId === user.id && (currentProfile?.onboardingComplete || currentProfile?.isOnboarded)) {
+            loadUserData(user, { isBackground: true });
+          } else {
+            setProfileStatus('loading');
+            loadUserData(user);
+          }
         }
       } else if (event === 'SIGNED_OUT' || !user) {
         setCurrentUser(null);
@@ -335,6 +333,7 @@ export const StudentProfileProvider = ({ children }) => {
         setSavedApplications([]);
         setNotifications([]);
         setProfileLoading(false);
+        setProfileRefreshing(false);
         setProfileError(null);
         clearProfileHint();
       }
@@ -350,7 +349,6 @@ export const StudentProfileProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribeScholarships = scholarshipService.subscribeToScholarshipChanges?.((payload) => {
       console.log('[StudentProfileContext] Realtime scholarship update received:', payload?.eventType);
-      // Refresh scholarships asynchronously to reflect newly approved changes live
       loadScholarshipsAsync();
     });
 
@@ -412,12 +410,17 @@ export const StudentProfileProvider = ({ children }) => {
     setProfileStatus('loaded');
     setProfile(prev => {
       const merged = { ...prev, ...updates };
+      if (updates.onboardingComplete || updates.isOnboarded || updates.onboardingStep >= 5) {
+        merged.onboardingComplete = true;
+        merged.isOnboarded = true;
+        merged.onboardingStep = 5;
+      }
       return merged;
     });
 
-    // Non-blocking async sync to backend
+    // Atomic sync to both Supabase and Spring Boot backend
     if (currentUser?.id) {
-      profileService.saveProfile(updates).catch(err => {
+      profileService.saveProfile(updates, currentUser.id).catch(err => {
         console.warn('[StudentProfileContext] Background profile sync notice:', err.message);
       });
     }
@@ -453,6 +456,39 @@ export const StudentProfileProvider = ({ children }) => {
     const updated = await applicationService.clearAllApplications(currentUser?.id);
     setSavedApplications(updated);
   }, [currentUser]);
+
+  // ── Notifications ─────────────────────────────────────────────────────────────
+  const markNotificationRead = useCallback(async (notificationId) => {
+    if (!notificationId) return;
+    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
+    await notificationService.markAsRead(notificationId, currentUser?.id);
+  }, [currentUser?.id]);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    await notificationService.markAllAsRead(currentUser?.id);
+  }, [currentUser?.id]);
+
+  const deleteNotification = useCallback(async (notificationId) => {
+    if (!notificationId) return;
+    const updated = await notificationService.deleteNotification(notificationId, currentUser?.id);
+    setNotifications(updated);
+  }, [currentUser?.id]);
+
+  const clearNotifications = useCallback(async () => {
+    const updated = await notificationService.clearAllNotifications(currentUser?.id);
+    setNotifications(updated);
+  }, [currentUser?.id]);
+
+  const addNotification = useCallback(async (notifData) => {
+    const created = await notificationService.createNotification(currentUser?.id, notifData);
+    if (created) {
+      setNotifications(prev => [created, ...prev]);
+    }
+    return created;
+  }, [currentUser?.id]);
+
+  const unreadNotificationCount = notifications.filter(n => !n.read).length;
 
   // ── Auth helpers ──────────────────────────────────────────────────────────────
   const signIn = async (email, password) => {
@@ -500,6 +536,7 @@ export const StudentProfileProvider = ({ children }) => {
       setSavedApplications([]);
       setNotifications([]);
       setProfileLoading(false);
+      setProfileRefreshing(false);
       setProfileError(null);
       clearProfileHint();
       try {
@@ -520,43 +557,7 @@ export const StudentProfileProvider = ({ children }) => {
     return await authService.updatePassword(newPassword);
   };
 
-  // ── Notifications ─────────────────────────────────────────────────────────────
-  const markNotificationRead = useCallback(async (notificationId) => {
-    if (!notificationId) return;
-    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
-    await notificationService.markAsRead(notificationId, currentUser?.id);
-  }, [currentUser?.id]);
-
-  const markAllNotificationsRead = useCallback(async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    await notificationService.markAllAsRead(currentUser?.id);
-  }, [currentUser?.id]);
-
-  const deleteNotification = useCallback(async (notificationId) => {
-    if (!notificationId) return;
-    const updated = await notificationService.deleteNotification(notificationId, currentUser?.id);
-    setNotifications(updated);
-  }, [currentUser?.id]);
-
-  const clearNotifications = useCallback(async () => {
-    const updated = await notificationService.clearAllNotifications(currentUser?.id);
-    setNotifications(updated);
-  }, [currentUser?.id]);
-
-  const addNotification = useCallback(async (notifData) => {
-    const created = await notificationService.createNotification(currentUser?.id, notifData);
-    if (created) {
-      setNotifications(prev => [created, ...prev]);
-    }
-    return created;
-  }, [currentUser?.id]);
-
-  const unreadNotificationCount = notifications.filter(n => !n.read).length;
-  const profileCompletionScore = profileService.calculateCompletion(profile);
-
-  // ── Backwards-compatible `loading` alias ─────────────────────────────────────
-  // Some child components may still read `loading`. Expose it as authLoading so
-  // they continue to work during the transition without requiring mass refactor.
+  const profileCompletionScore = profileService.calculateCompletion ? profileService.calculateCompletion(profile) : (profile.onboardingComplete ? 100 : 50);
   const loading = authLoading;
 
   return (
@@ -564,19 +565,24 @@ export const StudentProfileProvider = ({ children }) => {
       value={{
         currentUser,
         profile,
-        updateProfile,
         scholarships,
-        setScholarships,
-        evaluationResults,
+        bookmarks,
         savedApplications,
+        notifications,
+        authLoading,
+        profileLoading,
+        profileRefreshing,
+        profileStatus,
+        profileError,
+        retryProfile,
+        recalculateBackendEligibility,
+        updateProfile,
+        toggleBookmark,
+        isBookmarked,
         saveApplication,
         updateApplicationStatus,
         removeApplication,
         clearApplications,
-        bookmarks,
-        toggleBookmark,
-        isBookmarked,
-        notifications,
         unreadNotificationCount,
         markNotificationRead,
         markAllNotificationsRead,
@@ -588,14 +594,7 @@ export const StudentProfileProvider = ({ children }) => {
         signOut,
         resetPasswordForEmail,
         updatePassword,
-        recalculateBackendEligibility,
-        retryProfile,
-        // Granular loading & status states
-        authLoading,
-        profileLoading,
-        profileStatus,
-        profileError,
-        // Backwards-compat alias (authLoading only — never profile)
+        setScholarships,
         loading,
         profileCompletionScore
       }}
