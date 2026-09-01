@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudentProfile } from '../../context/StudentProfileContext';
-import { calculateDeadlineStatus } from '../../engine/eligibilityEngine';
+import { calculateDeadlineStatus, getScholarshipDeadlineDisplay, formatCalendarDate } from '../../engine/eligibilityEngine';
 import ScholarshipDetailModal from './ScholarshipDetailModal';
 import {
   Check,
@@ -42,23 +42,16 @@ const getScholarshipLogo = (scholarship) => {
   return '/scholarships/emblem_india.svg';
 };
 
+// Formats deadline to clean readable format
 const formatDeadline = (dateStr, status) => {
   if (!dateStr) {
-    if (status === 'YEAR_ROUND') return 'Year-Round / Rolling';
-    if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Availability Unverified';
+    if (status === 'YEAR_ROUND') return 'Applications Open Year-Round';
+    if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Check Official Portal';
     if (status === 'UPCOMING') return 'Upcoming Cycle';
     if (status === 'CLOSED') return 'Applications Closed';
-    return 'Refer Official Portal';
+    return 'Check Official Portal';
   }
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = d.getDate();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  } catch (e) {
-    return dateStr;
-  }
+  return formatCalendarDate(dateStr) || 'Check Official Portal';
 };
 
 // Utility: Get official verified URLs for a scholarship
@@ -493,11 +486,7 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
               {filteredScholarships.map((item) => {
                 const { scholarship, matchScore, isEligible, tier, evaluations } = item;
                 const isPossible = tier === 'POSSIBLE_MATCH';
-                const rawStatus = scholarship.status;
-                const deadline = scholarship.application_deadline || scholarship.applicationDeadline;
-                const openDate = scholarship.application_open_date || scholarship.applicationOpenDate || scholarship.application_start;
-                const lifecycleStatus = calculateDeadlineStatus(deadline, openDate, rawStatus);
-                const formattedDeadline = formatDeadline(deadline, lifecycleStatus);
+                const deadlineInfo = getScholarshipDeadlineDisplay(scholarship);
 
                 const categoryPill = scholarship.government_level === 'CENTRAL'
                   ? { label: 'Government (Central)', bg: 'bg-[#EFF6FF]', text: 'text-[#2563EB]' }
@@ -568,7 +557,7 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
                         </div>
                       </div>
 
-                      {/* Description */}
+                      {/* Short Description */}
                       <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
                         {scholarship.description}
                       </p>
@@ -583,9 +572,26 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <span className="text-[11px] text-slate-400 block font-semibold uppercase tracking-wider">Deadline</span>
-                          <span className="font-bold text-slate-900 text-xs sm:text-sm mt-0.5 block whitespace-nowrap">
-                            {formattedDeadline}
-                          </span>
+                          <div className="mt-0.5 flex flex-col items-end gap-0.5">
+                            <span className={`font-bold text-xs sm:text-sm whitespace-nowrap ${
+                              deadlineInfo.isClosed ? 'text-rose-600' : 'text-slate-900'
+                            }`}>
+                              {deadlineInfo.primaryText}
+                            </span>
+                            {deadlineInfo.badge && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                deadlineInfo.badgeType === 'warning'
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : deadlineInfo.badgeType === 'error'
+                                    ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                    : deadlineInfo.badgeType === 'info'
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
+                                {deadlineInfo.badge}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -636,18 +642,18 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
                         const { applicationUrl, websiteUrl } = getScholarshipUrls(scholarship);
                         const targetUrl = applicationUrl || websiteUrl;
                         let buttonText = 'Apply Now';
-                        const isLinkDisabled = !targetUrl;
+                        const isLinkDisabled = !targetUrl || deadlineInfo.isClosed;
 
-                        if (lifecycleStatus === 'CLOSED') {
+                        if (deadlineInfo.status === 'CLOSED') {
                           buttonText = 'Closed';
-                        } else if (lifecycleStatus === 'UPCOMING' || lifecycleStatus === 'NOT_YET_OPEN') {
+                        } else if (deadlineInfo.status === 'UPCOMING') {
                           buttonText = 'Upcoming';
-                        } else if (lifecycleStatus === 'AVAILABILITY_UNVERIFIED' || lifecycleStatus === 'UNKNOWN') {
+                        } else if (deadlineInfo.status === 'AVAILABILITY_UNVERIFIED' || deadlineInfo.status === 'UNKNOWN') {
                           buttonText = 'Check Official Website';
-                        } else if (lifecycleStatus === 'YEAR_ROUND') {
+                        } else if (deadlineInfo.status === 'YEAR_ROUND') {
                           buttonText = 'Apply (Year-Round)';
-                        } else {
-                          buttonText = applicationUrl ? 'Apply Now' : (websiteUrl ? 'Check Official Website' : 'Link Unavailable');
+                        } else if (!applicationUrl && websiteUrl) {
+                          buttonText = 'Check Official Website';
                         }
 
                         return (

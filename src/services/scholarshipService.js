@@ -25,6 +25,12 @@ function parseJsonValue(val) {
 
 export function normalizeScholarship(sch) {
   if (!sch) return sch;
+
+  const applicationDeadline = sch.application_deadline || sch.applicationDeadline || sch.deadline || null;
+  const applicationOpenDate = sch.application_open_date || sch.applicationOpenDate || sch.application_start || sch.applicationStart || null;
+  const isDeadlineExtended = Boolean(sch.is_deadline_extended || sch.isDeadlineExtended || false);
+  const status = (sch.status || 'OPEN').toUpperCase();
+
   return {
     ...sch,
     id: sch.id,
@@ -50,6 +56,13 @@ export function normalizeScholarship(sch) {
     amountMax: sch.amountMax !== undefined ? sch.amountMax : (sch.amount_max !== undefined ? sch.amount_max : 0),
     amount_type: sch.amount_type || sch.amountType || 'ANNUAL_GRANT',
     amountType: sch.amountType || sch.amount_type || 'ANNUAL_GRANT',
+    application_deadline: applicationDeadline,
+    applicationDeadline: applicationDeadline,
+    application_open_date: applicationOpenDate,
+    applicationOpenDate: applicationOpenDate,
+    is_deadline_extended: isDeadlineExtended,
+    isDeadlineExtended: isDeadlineExtended,
+    status: status,
     official_website_url: sch.official_website_url || sch.officialWebsiteUrl || sch.website_url || '',
     officialWebsiteUrl: sch.officialWebsiteUrl || sch.official_website_url || sch.website_url || '',
     official_application_url: sch.official_application_url || sch.officialApplicationUrl || sch.application_url || '',

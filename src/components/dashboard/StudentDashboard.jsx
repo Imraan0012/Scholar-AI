@@ -53,6 +53,7 @@ import ScholarshipSourcesView from '../sources/ScholarshipSourcesView';
 import { useSidebarCounts } from '../../hooks/useSidebarCounts';
 import ScholarshipDetailModal from '../results/ScholarshipDetailModal';
 import { MASTER_SCHOLARSHIP_REGISTRY } from '../../data/scholarships/index';
+import { getScholarshipDeadlineDisplay, formatCalendarDate } from '../../engine/eligibilityEngine';
 
 // Real Verified Crisp SVG Institution Logo Map
 const getScholarshipLogo = (scholarship) => {
@@ -78,14 +79,23 @@ const getScholarshipLogo = (scholarship) => {
   if (id.includes('hdfc') || name.includes('hdfc') || name.includes('badhte kadam')) {
     return '/scholarships/hdfc_logo.svg';
   }
-  if (id.includes('nsp') || name.includes('pm-usp') || name.includes('central sector') || name.includes('csss') || provider.includes('ministry of education') || provider.includes('government of india')) {
-    return '/scholarships/emblem_india.svg';
+  if (id.includes('pmrf') || name.includes('pmrf')) {
+    return '/scholarships/pmrf_logo.svg';
   }
-  if (id.includes('mahadbt') || name.includes('mahadbt') || provider.includes('maharashtra')) {
-    return '/scholarships/emblem_india.svg';
+  if (id.includes('ugc') || name.includes('ugc') || name.includes('csir')) {
+    return '/scholarships/ugc_logo.svg';
   }
-  if (id.includes('csir') || id.includes('ugc') || name.includes('csir') || name.includes('ugc') || name.includes('jrf')) {
-    return '/scholarships/emblem_india.svg';
+  if (id.includes('iisc') || name.includes('iisc')) {
+    return '/scholarships/iisc_logo.svg';
+  }
+  if (id.includes('ongc') || name.includes('ongc')) {
+    return '/scholarships/ongc_logo.svg';
+  }
+  if (id.includes('lic') || name.includes('lic')) {
+    return '/scholarships/lic_logo.svg';
+  }
+  if (id.includes('l&t') || id.includes('lt-') || name.includes('l&t')) {
+    return '/scholarships/lt_logo.svg';
   }
 
   return '/scholarships/emblem_india.svg';
@@ -114,23 +124,13 @@ const getScholarshipUrls = (scholarship) => {
 // Formats deadline to clean readable format
 const formatDeadline = (dateStr, status) => {
   if (!dateStr) {
-    if (status === 'YEAR_ROUND') return 'Year-Round / Rolling';
-    if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Availability Unverified';
+    if (status === 'YEAR_ROUND') return 'Applications Open Year-Round';
+    if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Check Official Portal';
     if (status === 'UPCOMING') return 'Upcoming Cycle';
     if (status === 'CLOSED') return 'Applications Closed';
-    return 'Refer Official Portal';
+    return 'Check Official Portal';
   }
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = d.getDate();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch (e) {
-    return dateStr;
-  }
+  return formatCalendarDate(dateStr) || 'Check Official Portal';
 };
 
 export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogout, onGoToHome }) {
@@ -2555,11 +2555,21 @@ function ScholarshipCardRef({ data, isSaved, onToggleSave, onViewDetails, onAppl
   const isIneligible = tier === 'INELIGIBLE';
 
   const logoSrc = getScholarshipLogo(scholarship);
-  const formattedDeadline = formatDeadline(scholarship.application_deadline, scholarship.status);
+  const deadlineInfo = getScholarshipDeadlineDisplay(scholarship);
   const { applicationUrl, websiteUrl } = getScholarshipUrls(scholarship);
   const targetUrl = applicationUrl || websiteUrl;
-  const buttonText = applicationUrl ? 'Apply Now' : websiteUrl ? 'View Official Website' : 'Application Link Unavailable';
-  const isLinkDisabled = !targetUrl;
+  
+  let buttonText = 'Apply Now';
+  if (deadlineInfo.status === 'CLOSED') {
+    buttonText = 'Applications Closed';
+  } else if (deadlineInfo.status === 'UPCOMING') {
+    buttonText = 'Upcoming Cycle';
+  } else if (deadlineInfo.status === 'AVAILABILITY_UNVERIFIED' || deadlineInfo.status === 'UNKNOWN') {
+    buttonText = websiteUrl ? 'Check Official Website' : 'Check Official Portal';
+  } else {
+    buttonText = applicationUrl ? 'Apply Now' : websiteUrl ? 'Check Official Website' : 'Check Official Portal';
+  }
+  const isLinkDisabled = !targetUrl || deadlineInfo.isClosed;
 
   // Category Tag Styling
   const categoryPill = useMemo(() => {
@@ -2648,9 +2658,26 @@ function ScholarshipCardRef({ data, isSaved, onToggleSave, onViewDetails, onAppl
           </div>
           <div className="text-right flex-shrink-0">
             <span className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">Deadline</span>
-            <span className="font-bold text-slate-900 text-xs mt-0.5 block whitespace-nowrap">
-              {formattedDeadline}
-            </span>
+            <div className="mt-0.5 flex flex-col items-end gap-0.5">
+              <span className={`font-bold text-xs whitespace-nowrap ${
+                deadlineInfo.isClosed ? 'text-rose-600' : 'text-slate-900'
+              }`}>
+                {deadlineInfo.primaryText}
+              </span>
+              {deadlineInfo.badge && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                  deadlineInfo.badgeType === 'warning'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : deadlineInfo.badgeType === 'error'
+                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                      : deadlineInfo.badgeType === 'info'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}>
+                  {deadlineInfo.badge}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

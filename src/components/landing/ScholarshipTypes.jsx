@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ExternalLink, ShieldCheck, Calendar, Building, Landmark, Check } from 'lucide-react';
 import { useStudentProfile } from '../../context/StudentProfileContext';
+import { getScholarshipDeadlineDisplay } from '../../engine/eligibilityEngine';
 import StatusBadge from '../ui/StatusBadge';
 import ScholarshipDetailModal from '../results/ScholarshipDetailModal';
 
@@ -13,25 +14,6 @@ export default function ScholarshipTypes({ onCheckEligibilityClick }) {
   const previewList = (scholarships && scholarships.length > 0)
     ? scholarships.slice(0, 3)
     : [];
-
-  const formatDeadline = (dateStr, status) => {
-    if (!dateStr) {
-      if (status === 'YEAR_ROUND') return 'Year-Round / Rolling';
-      if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Availability Unverified';
-      if (status === 'UPCOMING') return 'Upcoming Cycle';
-      if (status === 'CLOSED') return 'Applications Closed';
-      return 'Refer Official Portal';
-    }
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      const day = d.getDate();
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-    } catch (e) {
-      return dateStr;
-    }
-  };
 
   const getTargetUrl = (s) => {
     return s.official_application_url || s.application_url || s.official_website_url || s.website_url || null;
@@ -62,9 +44,8 @@ export default function ScholarshipTypes({ onCheckEligibilityClick }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
         {previewList.map((item) => {
           const targetUrl = getTargetUrl(item);
-          const deadlineText = formatDeadline(item.application_deadline, item.status);
-          const isClosed = item.status === 'CLOSED';
-          const isUnverified = item.status === 'AVAILABILITY_UNVERIFIED';
+          const deadlineInfo = getScholarshipDeadlineDisplay(item);
+          const isClosed = deadlineInfo.isClosed;
 
           return (
             <div
@@ -102,7 +83,7 @@ export default function ScholarshipTypes({ onCheckEligibilityClick }) {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-gray-400 block tracking-wider">Deadline</span>
                     <span className="font-semibold text-gray-200 text-xs mt-0.5 block truncate">
-                      {deadlineText}
+                      {deadlineInfo.primaryText}
                     </span>
                   </div>
                 </div>

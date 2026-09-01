@@ -5,6 +5,34 @@
 // =============================================================================
 
 /**
+ * Formats a calendar date string (YYYY-MM-DD) into clean Indian date format (e.g. "30 Sep 2026")
+ * without timezone/UTC day-shift artifacts.
+ */
+export function formatCalendarDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('T')[0].split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (!isNaN(year) && monthIdx >= 0 && monthIdx < 12 && !isNaN(day)) {
+      return `${day} ${months[monthIdx]} ${year}`;
+    }
+  }
+
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    const day = d.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  } catch (e) {
+    return String(dateStr);
+  }
+}
+
+/**
  * Calculates current deadline lifecycle status.
  */
 export function calculateDeadlineStatus(deadlineDateStr, startDateStr, explicitStatus) {
@@ -38,6 +66,102 @@ export function calculateDeadlineStatus(deadlineDateStr, startDateStr, explicitS
   } else {
     return 'OPEN';
   }
+}
+
+/**
+ * Returns a comprehensive, lifecycle-aware deadline display object.
+ */
+export function getScholarshipDeadlineDisplay(scholarship) {
+  if (!scholarship) {
+    return {
+      primaryText: 'Check Official Portal',
+      badge: null,
+      badgeType: null,
+      status: 'AVAILABILITY_UNVERIFIED'
+    };
+  }
+
+  const deadline = scholarship.application_deadline || scholarship.applicationDeadline || scholarship.deadline || null;
+  const openDate = scholarship.application_open_date || scholarship.applicationOpenDate || scholarship.application_start || scholarship.applicationStart || null;
+  const isExtended = Boolean(scholarship.is_deadline_extended || scholarship.isDeadlineExtended || false);
+  const explicitStatus = (scholarship.status || '').toUpperCase();
+
+  const lifecycleStatus = calculateDeadlineStatus(deadline, openDate, explicitStatus);
+
+  // CASE: CLOSED
+  if (lifecycleStatus === 'CLOSED' || explicitStatus === 'CLOSED') {
+    return {
+      primaryText: deadline ? `Closed on ${formatCalendarDate(deadline)}` : 'Applications Closed',
+      badge: 'Closed',
+      badgeType: 'error',
+      isClosed: true,
+      isOpen: false,
+      isYearRound: false,
+      status: 'CLOSED'
+    };
+  }
+
+  // CASE: UPCOMING / NOT_YET_OPEN
+  if (lifecycleStatus === 'UPCOMING' || explicitStatus === 'UPCOMING' || explicitStatus === 'NOT_YET_OPEN') {
+    return {
+      primaryText: openDate ? `Opens ${formatCalendarDate(openDate)}` : 'Upcoming Cycle',
+      badge: 'Upcoming',
+      badgeType: 'info',
+      isClosed: false,
+      isOpen: false,
+      isYearRound: false,
+      status: 'UPCOMING'
+    };
+  }
+
+  // CASE: YEAR_ROUND
+  if (lifecycleStatus === 'YEAR_ROUND' || explicitStatus === 'YEAR_ROUND') {
+    return {
+      primaryText: 'Applications Open Year-Round',
+      badge: 'Rolling',
+      badgeType: 'neutral',
+      isClosed: false,
+      isOpen: true,
+      isYearRound: true,
+      status: 'YEAR_ROUND'
+    };
+  }
+
+  // CASE: VERIFIED DEADLINE PRESENT
+  if (deadline) {
+    const formattedDate = formatCalendarDate(deadline);
+    let badge = null;
+    let badgeType = null;
+
+    if (isExtended) {
+      badge = 'Extended';
+      badgeType = 'info';
+    } else if (lifecycleStatus === 'CLOSING_SOON' || explicitStatus === 'CLOSING_SOON') {
+      badge = 'Closing Soon';
+      badgeType = 'warning';
+    }
+
+    return {
+      primaryText: formattedDate,
+      badge,
+      badgeType,
+      isClosed: false,
+      isOpen: true,
+      isYearRound: false,
+      status: lifecycleStatus
+    };
+  }
+
+  // CASE: UNVERIFIED / UNKNOWN DEADLINE
+  return {
+    primaryText: 'Check Official Portal',
+    badge: null,
+    badgeType: null,
+    isClosed: false,
+    isOpen: true,
+    isYearRound: false,
+    status: explicitStatus || 'AVAILABILITY_UNVERIFIED'
+  };
 }
 
 /**

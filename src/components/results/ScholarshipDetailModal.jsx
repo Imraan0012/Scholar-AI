@@ -18,7 +18,7 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
-import { calculateDeadlineStatus } from '../../engine/eligibilityEngine';
+import { calculateDeadlineStatus, getScholarshipDeadlineDisplay, formatCalendarDate } from '../../engine/eligibilityEngine';
 import { useStudentProfile } from '../../context/StudentProfileContext';
 
 // Utility: Get official verified URLs for a scholarship
@@ -39,19 +39,6 @@ const getScholarshipUrls = (scholarship) => {
     null;
 
   return { applicationUrl, websiteUrl };
-};
-
-const formatDeadline = (dateStr) => {
-  if (!dateStr) return 'Refer Official Portal';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = d.getDate();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  } catch (e) {
-    return dateStr;
-  }
 };
 
 export default function ScholarshipDetailModal({ scholarship, evaluation, result, isOpen, onClose, onSaveApplication }) {
@@ -102,40 +89,28 @@ export default function ScholarshipDetailModal({ scholarship, evaluation, result
   const targetUrl = applicationUrl || websiteUrl;
   const govLevel = activeScholarship.government_level || activeScholarship.governmentLevel || 'GOVERNMENT';
   const amountDisplay = activeScholarship.amount_display || activeScholarship.amountDisplay || activeScholarship.amount || 'Benefit details available on official portal';
-  const deadline = activeScholarship.application_deadline || activeScholarship.applicationDeadline || activeScholarship.deadline;
-  const openDate = activeScholarship.application_open_date || activeScholarship.applicationOpenDate || activeScholarship.application_start;
-  const rawStatus = activeScholarship.status;
   const reqDocs = activeScholarship.required_documents || activeScholarship.requiredDocuments || activeScholarship.documents || [];
   const rules = activeScholarship.rules || [];
 
-  const lifecycleStatus = calculateDeadlineStatus(deadline, openDate, rawStatus);
+  const deadlineInfo = getScholarshipDeadlineDisplay(activeScholarship);
 
   let buttonText = 'Apply on Official Portal';
-  const isLinkDisabled = !targetUrl;
+  const isLinkDisabled = !targetUrl || deadlineInfo.isClosed;
 
-  if (lifecycleStatus === 'CLOSED') {
+  if (deadlineInfo.status === 'CLOSED') {
     buttonText = 'Applications Closed';
-  } else if (lifecycleStatus === 'UPCOMING' || lifecycleStatus === 'NOT_YET_OPEN') {
+  } else if (deadlineInfo.status === 'UPCOMING') {
     buttonText = 'Upcoming Cycle (Check Website)';
-  } else if (lifecycleStatus === 'AVAILABILITY_UNVERIFIED' || lifecycleStatus === 'UNKNOWN') {
+  } else if (deadlineInfo.status === 'AVAILABILITY_UNVERIFIED' || deadlineInfo.status === 'UNKNOWN') {
     buttonText = 'Check Official Website';
-  } else if (lifecycleStatus === 'YEAR_ROUND') {
+  } else if (deadlineInfo.status === 'YEAR_ROUND') {
     buttonText = 'Apply on Official Portal (Year-Round)';
   } else {
     buttonText = applicationUrl ? 'Apply on Official Portal' : (websiteUrl ? 'Check Official Website' : 'Portal Link Unavailable');
   }
 
-  const formatDeadlineDisplay = (dStr) => {
-    if (dStr) return formatDeadline(dStr);
-    if (lifecycleStatus === 'YEAR_ROUND') return 'Year-Round / Rolling Submissions';
-    if (lifecycleStatus === 'AVAILABILITY_UNVERIFIED' || lifecycleStatus === 'UNKNOWN') return 'Refer to Official Portal';
-    if (lifecycleStatus === 'UPCOMING') return 'Upcoming Cycle';
-    if (lifecycleStatus === 'CLOSED') return 'Applications Closed';
-    return 'Refer to Official Portal';
-  };
-
   const handleApplyClick = () => {
-    if (targetUrl) {
+    if (targetUrl && !deadlineInfo.isClosed) {
       onSaveApplication?.(activeScholarship, 'APPLIED');
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }
@@ -241,10 +216,25 @@ export default function ScholarshipDetailModal({ scholarship, evaluation, result
             </div>
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
               <span className="text-[10.5px] text-slate-400 uppercase tracking-wider font-extrabold block">Application Timeline</span>
-              <span className="text-sm font-bold text-slate-900 block mt-1 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                {formatDeadlineDisplay(deadline)}
-              </span>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  {deadlineInfo.primaryText}
+                </span>
+                {deadlineInfo.badge && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                    deadlineInfo.badgeType === 'warning'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : deadlineInfo.badgeType === 'error'
+                        ? 'bg-rose-50 text-rose-800 border-rose-200'
+                        : deadlineInfo.badgeType === 'info'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>
+                    {deadlineInfo.badge}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
