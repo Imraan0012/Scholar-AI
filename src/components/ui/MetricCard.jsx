@@ -11,7 +11,7 @@ const metricCardVariants = cva(
         light: 'bg-white border-slate-200/90 text-slate-900 hover:border-blue-400/40 hover:shadow-md shadow-xs',
       },
       size: {
-        default: 'min-h-[88px] sm:min-h-[96px]',
+        default: 'min-h-[76px] sm:min-h-[84px]',
         compact: 'min-h-[72px] sm:min-h-[80px] p-2 sm:p-2.5',
         large: 'min-h-[110px] sm:min-h-[120px] p-3 sm:p-4',
       }
@@ -45,7 +45,7 @@ export default function MetricCard({
       {/* Primary Value */}
       <div className="w-full flex items-center justify-center px-1">
         <div className={cn(
-          "text-base sm:text-lg md:text-xl font-bold tracking-tight leading-none whitespace-nowrap inline-flex items-baseline justify-center gap-0.5",
+          "text-sm sm:text-base md:text-[17px] font-bold tracking-tight leading-none whitespace-nowrap inline-flex items-baseline justify-center gap-0.5",
           accentColor
         )}>
           {value || children}
@@ -55,7 +55,7 @@ export default function MetricCard({
       {/* Primary Label */}
       {label && (
         <span className={cn(
-          "text-[10.5px] sm:text-[11.5px] font-semibold tracking-tight mt-1 block leading-tight whitespace-nowrap",
+          "text-[9.5px] sm:text-[10.5px] font-semibold tracking-tight mt-1 block leading-tight whitespace-nowrap",
           theme === 'light' ? 'text-slate-800' : 'text-gray-200'
         )}>
           {label}
@@ -65,7 +65,7 @@ export default function MetricCard({
       {/* Secondary Description */}
       {subtitle && (
         <span className={cn(
-          "text-[9px] sm:text-[10px] font-normal leading-tight mt-0.5 block whitespace-nowrap",
+          "text-[8px] sm:text-[9px] font-normal leading-tight mt-0.5 block whitespace-nowrap",
           theme === 'light' ? 'text-slate-500' : 'text-gray-400'
         )}>
           {subtitle}
