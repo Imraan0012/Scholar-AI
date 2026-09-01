@@ -3,19 +3,17 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const metricCardVariants = cva(
-  'relative flex flex-col justify-between items-center text-center p-4 sm:p-5 rounded-2xl border transition-all duration-300 backdrop-blur-xl group select-none h-full',
+  'relative flex flex-col justify-between items-center text-center p-4 sm:p-5 rounded-2xl border border-white/10 bg-[#0d0f1a]/85 shadow-xl transition-all duration-300 backdrop-blur-xl group select-none h-full w-full',
   {
     variants: {
       theme: {
-        dark: 'bg-[#0d0f1a]/85 border-white/10 text-white hover:border-indigo-500/40 hover:bg-[#121528]/90 shadow-xl',
+        dark: 'border-white/10 text-white hover:border-indigo-500/40 hover:bg-[#121528]/90',
         light: 'bg-white border-slate-200/90 text-slate-900 hover:border-blue-400/40 hover:shadow-md shadow-xs',
-        emerald: 'bg-emerald-950/20 border-emerald-500/20 text-white hover:border-emerald-500/40',
-        cyan: 'bg-cyan-950/20 border-cyan-500/20 text-white hover:border-cyan-500/40',
       },
       size: {
-        default: 'min-h-[140px] sm:min-h-[150px]',
-        compact: 'min-h-[100px] sm:min-h-[110px] p-3 sm:p-4',
-        large: 'min-h-[160px] sm:min-h-[170px] p-5 sm:p-6',
+        default: 'min-h-[165px] sm:min-h-[175px]',
+        compact: 'min-h-[120px] sm:min-h-[130px] p-3 sm:p-4',
+        large: 'min-h-[180px] sm:min-h-[190px] p-5 sm:p-6',
       }
     },
     defaultVariants: {
@@ -39,35 +37,35 @@ export default function MetricCard({
   return (
     <div className={cn(metricCardVariants({ theme, size }), className)}>
       {Icon && (
-        <div className="mb-2 p-2 rounded-xl bg-white/5 border border-white/10 text-gray-300">
-          <Icon className="w-4 h-4" />
+        <div className="mb-2 p-1.5 rounded-xl bg-white/5 border border-white/10 text-gray-300">
+          <Icon className="w-3.5 h-3.5" />
         </div>
       )}
 
-      {/* Primary Metric Value */}
-      <div className="w-full flex items-center justify-center my-auto">
+      {/* LEVEL 1 — VALUE (Standardized 32-34px typography & safe baseline alignment) */}
+      <div className="w-full flex items-center justify-center my-auto px-2">
         <div className={cn(
-          "text-2xl sm:text-3xl font-bold tracking-tight leading-none whitespace-nowrap inline-flex items-baseline justify-center gap-1",
+          "text-[30px] sm:text-[32px] md:text-[34px] font-bold tracking-tight leading-none whitespace-nowrap inline-flex items-baseline justify-center gap-1",
           accentColor
         )}>
           {value || children}
         </div>
       </div>
 
-      {/* Primary Label */}
+      {/* LEVEL 2 — LABEL (14.5-15px font-semibold text-gray-200) */}
       {label && (
         <span className={cn(
-          "text-xs sm:text-[13px] font-semibold tracking-tight mt-1.5 block leading-snug whitespace-nowrap",
+          "text-[14px] sm:text-[15px] font-semibold tracking-tight mt-1.5 block leading-snug whitespace-nowrap",
           theme === 'light' ? 'text-slate-800' : 'text-gray-200'
         )}>
           {label}
         </span>
       )}
 
-      {/* Secondary Description */}
+      {/* LEVEL 3 — DESCRIPTION (13-13.5px regular muted text-gray-400) */}
       {subtitle && (
         <span className={cn(
-          "text-[11px] sm:text-xs font-normal leading-normal mt-0.5 block",
+          "text-[12.5px] sm:text-[13px] font-normal leading-normal mt-1 block",
           theme === 'light' ? 'text-slate-500' : 'text-gray-400'
         )}>
           {subtitle}
