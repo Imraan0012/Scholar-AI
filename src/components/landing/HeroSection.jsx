@@ -1,28 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, ChevronRight, Landmark, Building2, GraduationCap } from 'lucide-react';
 import { HoverBorderGradient } from '../ui/HoverBorderGradient';
-import { FlipWords } from '../ui/flip-words';
 import TiltCard from '../ui/TiltCard';
 import CounterNumber from '../ui/CounterNumber';
 import MagneticButton from '../ui/MagneticButton';
 
 import { useStudentProfile } from '../../context/StudentProfileContext';
 import { profileService } from '../../services/profileService';
+import { scholarshipService } from '../../services/scholarshipService';
 import MetricCard from '../ui/MetricCard';
 
 export default function HeroSection({ currentUser, onCheckEligibilityClick, onAuthClick }) {
-  const { profile, scholarships } = useStudentProfile();
-  const liveCatalogCount = (scholarships && scholarships.length > 0) ? scholarships.length : 63;
+  const { profile, scholarships, profileStatus, profileLoading, authLoading } = useStudentProfile();
+  const [liveCount, setLiveCount] = useState(null);
 
+  // Authoritative dynamic count from API
+  useEffect(() => {
+    let isMounted = true;
+    scholarshipService.getCount()
+      .then((count) => {
+        if (isMounted && typeof count === 'number' && count > 0) {
+          setLiveCount(count);
+        }
+      })
+      .catch(() => {
+        if (isMounted && Array.isArray(scholarships) && scholarships.length > 0) {
+          setLiveCount(scholarships.length);
+        }
+      });
+    return () => { isMounted = false; };
+  }, [scholarships]);
+
+  const displayCount = liveCount !== null
+    ? liveCount
+    : (Array.isArray(scholarships) && scholarships.length > 0 ? scholarships.length : null);
+
+  // Centralized profile completion evaluation
   const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-  const isProfileComplete = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+  const isProfileComplete = Boolean(profile?.onboardingComplete || profile?.isOnboarded || profile?.onboardingStep >= 5) || firstIncomplete === 6;
 
-  const ctaText = !currentUser
-    ? 'Check My Eligibility'
-    : isProfileComplete
-    ? 'View My Matches'
-    : 'Complete My Profile';
+  // Exact profile CTA state machine
+  let ctaText = 'Check My Eligibility';
+  if (currentUser) {
+    if (authLoading || profileLoading || profileStatus === 'loading') {
+      // Neutral state during loading — NEVER flash "Complete My Profile" on existing users
+      ctaText = isProfileComplete ? 'View My Matches' : 'View My Matches';
+    } else if (profileStatus === 'loaded') {
+      ctaText = isProfileComplete ? 'View My Matches' : 'Complete My Profile';
+    } else if (profileStatus === 'not_found') {
+      ctaText = 'Complete My Profile';
+    } else {
+      // On error / fallback, preserve known profile state
+      ctaText = isProfileComplete ? 'View My Matches' : 'Check My Eligibility';
+    }
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -49,7 +81,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
   };
 
   return (
-    <section id="hero" className="relative min-h-[75vh] pt-24 pb-10 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 overflow-hidden z-10">
+    <section id="hero" className="relative min-h-[75vh] pt-24 pb-12 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 overflow-hidden z-10">
 
       <motion.div
         variants={containerVariants}
@@ -57,16 +89,13 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         animate="visible"
         className="w-full max-w-3xl flex flex-col items-center"
       >
-        {/* Top Tagline Pill with Live Pulse */}
+        {/* Subtle Eyebrow Badge */}
         <motion.div
           variants={itemVariants}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#101322]/90 border border-indigo-500/30 text-indigo-200 text-xs font-semibold mb-4 shadow-lg shadow-indigo-950/40 hover:border-indigo-400/50 transition-colors select-none"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#101322]/90 border border-indigo-500/30 text-indigo-200 text-xs font-semibold mb-4 shadow-lg shadow-indigo-950/40 select-none"
         >
           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-emerald-400 font-bold tracking-tight">
-            Official Sources
-          </span>
-          <span className="text-gray-300">Verified Central & State Scholarships</span>
+          <span className="text-gray-300 font-medium">Official sources • Central & state scholarships</span>
         </motion.div>
 
         {/* Main Headline */}
@@ -80,7 +109,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
           </span>
         </motion.h1>
 
-        {/* Clear Domain-Specific Supporting Text */}
+        {/* Clear Supporting Text */}
         <motion.p
           variants={itemVariants}
           className="mt-3.5 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
@@ -88,7 +117,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
           Tell us about your education, family income, category and State of Residence. Scholar AI checks scholarship requirements and shows the schemes that match your profile.
         </motion.p>
 
-        {/* Dominant Call To Action Bar with Magnetic hover */}
+        {/* Dominant Call To Action Bar */}
         <motion.div
           variants={itemVariants}
           className="mt-6 flex flex-col sm:flex-row items-center gap-3 z-20"
@@ -124,74 +153,90 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
           </a>
         </motion.div>
 
-        {/* Trust Metrics Bar with 3D Tilt Cards & Counter Animation */}
+        {/* 4 Stat Cards Grid (EXACT 3-LEVEL STRUCTURE) */}
         <motion.div
           variants={itemVariants}
-          className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 max-w-4xl w-full"
+          className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 max-w-4xl w-full"
         >
+          {/* Card 1: Scholarships Tracked in Catalog */}
           <TiltCard maxTilt={6} className="h-full">
             <MetricCard
               theme="dark"
               size="default"
               className="h-full"
-              value={<CounterNumber value={liveCatalogCount} duration={2} />}
-              label="Scholarships Tracked"
-              subtitle="Verified active in catalog"
+              value={
+                displayCount !== null ? (
+                  <span className="whitespace-nowrap inline-flex items-baseline">
+                    <CounterNumber value={displayCount} duration={1.8} />
+                    <span>+</span>
+                  </span>
+                ) : (
+                  <span>—</span>
+                )
+              }
+              label="Scholarships"
+              subtitle="Tracked in catalog"
               accentColor="text-white"
             />
           </TiltCard>
 
+          {/* Card 2: 12h Auto Refresh */}
           <TiltCard maxTilt={6} className="h-full">
             <MetricCard
               theme="dark"
               size="default"
               className="h-full"
-              value="12 Hours"
-              label="Catalog Refresh"
-              subtitle="Automated verification cycle"
+              value="12h"
+              label="Auto Refresh"
+              subtitle="Every 12 hours"
               accentColor="text-emerald-400"
             />
           </TiltCard>
 
+          {/* Card 3: Pan-India Coverage */}
           <TiltCard maxTilt={6} className="h-full">
             <MetricCard
               theme="dark"
               size="default"
               className="h-full"
               value="Pan-India"
-              label="Central & State Schemes"
-              subtitle="Government & trust grants"
+              label="Coverage"
+              subtitle="Central & state schemes"
               accentColor="text-cyan-400"
             />
           </TiltCard>
 
+          {/* Card 4: Official Sources */}
           <TiltCard maxTilt={6} className="h-full">
             <MetricCard
               theme="dark"
               size="default"
               className="h-full"
-              value="Official Sources"
-              label="Application Links"
-              subtitle="Direct portal redirects"
+              value="Official"
+              label="Sources"
+              subtitle="Direct application portals"
               accentColor="text-indigo-300"
             />
           </TiltCard>
         </motion.div>
 
-        {/* Quick Scheme Links Badge */}
+        {/* Centered Official Source / Trust Row */}
         <motion.div
           variants={itemVariants}
-          className="mt-6 flex flex-wrap items-center justify-center gap-5 text-xs text-gray-400 font-medium"
+          className="mt-8 flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-xs sm:text-[13px] text-gray-300 font-medium"
         >
-          <span className="flex items-center gap-1.5 hover:text-indigo-300 transition-colors">
-            <Landmark className="w-3.5 h-3.5 text-indigo-400" /> National Scholarship Portal (NSP)
-          </span>
-          <span className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors">
-            <Building2 className="w-3.5 h-3.5 text-cyan-400" /> State Scholarship Portals (MahaDBT, SSP)
-          </span>
-          <span className="flex items-center gap-1.5 hover:text-emerald-300 transition-colors">
-            <GraduationCap className="w-3.5 h-3.5 text-emerald-400" /> Corporate Philanthropy (Tata, Reliance)
-          </span>
+          <div className="flex items-center gap-2">
+            <Landmark className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+            <span>National Scholarship Portal (NSP)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+            <span>State Scholarship Portals</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>Foundation & CSR Scholarships</span>
+          </div>
         </motion.div>
       </motion.div>
     </section>
