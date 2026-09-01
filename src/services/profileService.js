@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabaseClient.js';
  */
 export function mapSupabaseProfileToDTO(row) {
   if (!row) return null;
-  const isComplete = Boolean(row.onboarding_complete);
+  const isComplete = Boolean(row.onboarding_complete || (row.onboarding_step != null && row.onboarding_step >= 5));
 
   return {
     id: row.id,
@@ -85,7 +85,7 @@ export function mapSupabaseProfileToDTO(row) {
     competitiveExamRank: row.competitive_exam_rank,
 
     // Workflow State
-    onboardingStep: row.onboarding_step != null ? row.onboarding_step : (isComplete ? 5 : 1),
+    onboardingStep: isComplete ? 5 : (row.onboarding_step != null ? row.onboarding_step : 1),
     onboardingComplete: isComplete,
     isOnboarded: isComplete,
     profileCompletionScore: row.profile_completion_score || (isComplete ? 100 : 50),
@@ -98,7 +98,7 @@ export function mapSupabaseProfileToDTO(row) {
  */
 export function mapDTOToSupabaseRow(userId, dto) {
   if (!userId || !dto) return null;
-  const isComplete = Boolean(dto.onboardingComplete === true || dto.isOnboarded === true);
+  const isComplete = Boolean(dto.onboardingComplete || dto.isOnboarded || dto.onboardingStep >= 5);
 
   const row = {
     user_id: userId,
@@ -280,7 +280,7 @@ export const profileService = {
         if (!sbErr && !sbRow) {
           return null; // Confirmed absent
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return null;
@@ -295,7 +295,7 @@ export const profileService = {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         resolvedUserId = session?.user?.id;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // 1. Save directly to Supabase table as immediate atomic persistence
@@ -327,7 +327,7 @@ export const profileService = {
    */
   async saveOnboardingStep(stepNumber, stepData, userId = null) {
     this.saveOnboardingProgress(stepNumber, stepData);
-    const isCompleted = Boolean(stepData.onboardingComplete === true || stepData.isOnboarded === true);
+    const isCompleted = stepNumber >= 5;
     const payload = {
       ...stepData,
       onboardingStep: stepNumber,
@@ -340,7 +340,7 @@ export const profileService = {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         resolvedUserId = session?.user?.id;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Direct Supabase upsert
@@ -373,7 +373,7 @@ export const profileService = {
   saveOnboardingProgress(stepNumber, stepData) {
     try {
       localStorage.setItem('scholar_ai_onboarding_step', String(stepNumber));
-    } catch (e) {}
+    } catch (e) { }
   },
 
   /**
@@ -382,16 +382,27 @@ export const profileService = {
    */
   getFirstIncompleteStep(p) {
     if (!p) return 1;
-    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true) {
+    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true || p.onboardingStep >= 5) {
       return 6;
     }
 
-    // Helper: treat null/undefined/empty-string as missing
+    // If core profile fields are already filled, treat profile as completed
+    const hasCore = Boolean(
+      (p.fullName || p.name) &&
+      (p.course || p.educationLevel) &&
+      (p.annualIncome || p.annualFamilyIncome != null) &&
+      (p.domicileState || p.state)
+    );
+    if (hasCore) {
+      return 6;
+    }
+
+    // Helper: treat null/undefined/empty-string/0 as missing
     const has = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '0';
-    const hasNum = (v) => v !== undefined && v !== null && v !== '' && !isNaN(Number(v));
+    const hasNum = (v) => v !== undefined && v !== null && v !== '' && !isNaN(Number(v)) && Number(v) > 0;
 
     // --- STEP 1: Personal Details ---
-    const hasName = Boolean((p.fullName && String(p.fullName).trim()) || (p.name && String(p.name).trim()));
+    const hasName = Boolean(p.fullName && String(p.fullName).trim());
     const hasDob = has(p.dob) || has(p.dateOfBirth);
     const hasGender = has(p.gender) && p.gender !== 'ANY';
     const hasEmail = Boolean(p.email && String(p.email).trim());
@@ -410,7 +421,10 @@ export const profileService = {
     } else if (edu === 'DIPLOMA') {
       const hasCourse = Boolean((p.course && p.course.trim()) || (p.diplomaCourse && p.diplomaCourse.trim()));
       if (!hasCourse) return 2;
-    } else {
+    } else if (edu === 'UNDERGRADUATE') {
+      const hasCourse = Boolean(p.course && p.course.trim());
+      if (!hasCourse) return 2;
+    } else if (edu === 'POSTGRADUATE') {
       const hasCourse = Boolean(p.course && p.course.trim());
       if (!hasCourse) return 2;
     }
@@ -422,17 +436,11 @@ export const profileService = {
       return 3;
     }
 
-    // --- STEP 4: Category & State of Residence ---
-    const hasCategory = has(p.category) || has(p.socialCategory);
-    const hasState = has(p.domicileState) || has(p.state) || has(p.currentResidenceState);
-    if (!hasCategory || !hasState) {
+    // --- STEP 4: Category & Domicile ---
+    const hasCategory = has(p.category);
+    const hasDomicile = has(p.domicileState) || has(p.state) || has(p.currentResidenceState);
+    if (!hasCategory || !hasDomicile) {
       return 4;
-    }
-
-    // --- STEP 5: Additional Information ---
-    const hasAppType = has(p.applicationType);
-    if (!hasAppType) {
-      return 5;
     }
 
     return 6;

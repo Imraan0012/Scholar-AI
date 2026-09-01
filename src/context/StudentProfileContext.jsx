@@ -112,13 +112,13 @@ function writeProfileHint(profileExists, onboardingCompleted) {
       onboardingCompleted,
       cachedAt: Date.now()
     }));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function clearProfileHint() {
   try {
     localStorage.removeItem('scholar_ai_profile_hint');
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ export const StudentProfileProvider = ({ children }) => {
         writeProfileHint(true, isCompleted);
         try {
           localStorage.setItem('scholar_ai_onboarding_step', String(step));
-        } catch (e) {}
+        } catch (e) { }
       } else {
         // If we already have a loaded, completed profile in memory, do NOT downgrade to not_found on empty background sync
         if (profileRef.current?.id && (profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded)) {
@@ -365,13 +365,13 @@ export const StudentProfileProvider = ({ children }) => {
 
     const unsubscribeNotifs = typeof notificationService?.subscribeToUserNotifications === 'function'
       ? notificationService.subscribeToUserNotifications(
-          currentUser.id,
-          async () => {
-            const refreshed = await notificationService.getNotifications(currentUser.id);
-            setNotifications(refreshed);
-          }
-        )
-      : () => {};
+        currentUser.id,
+        async () => {
+          const refreshed = await notificationService.getNotifications(currentUser.id);
+          setNotifications(refreshed);
+        }
+      )
+      : () => { };
 
     return () => {
       if (typeof unsubscribeNotifs === 'function') unsubscribeNotifs();
@@ -410,7 +410,7 @@ export const StudentProfileProvider = ({ children }) => {
     setProfileStatus('loaded');
     setProfile(prev => {
       const merged = { ...prev, ...updates };
-      if (updates.onboardingComplete === true || updates.isOnboarded === true) {
+      if (updates.onboardingComplete || updates.isOnboarded || updates.onboardingStep >= 5) {
         merged.onboardingComplete = true;
         merged.isOnboarded = true;
         merged.onboardingStep = 5;
@@ -545,7 +545,7 @@ export const StudentProfileProvider = ({ children }) => {
         localStorage.removeItem('scholar_ai_student_profile');
         localStorage.removeItem('scholar_ai_user_notifications');
         localStorage.removeItem('scholar_ai_onboarding_step');
-      } catch (e) {}
+      } catch (e) { }
     }
   };
 

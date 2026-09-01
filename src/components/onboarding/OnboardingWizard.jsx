@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudentProfile } from '../../context/StudentProfileContext';
 import { profileService } from '../../services/profileService';
@@ -99,17 +99,17 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
     return (firstIncomplete >= 1 && firstIncomplete <= 5) ? firstIncomplete : 1;
   });
 
-  // Initial mount guard ONLY: If an already-completed user enters OnboardingWizard directly, redirect to analysis
-  const hasCheckedInitial = useRef(false);
+  // Guard: If an already-completed user enters OnboardingWizard, automatically redirect them to analysis/dashboard
   useEffect(() => {
-    if (!hasCheckedInitial.current && profileStatus === 'loaded') {
-      hasCheckedInitial.current = true;
-      if (profile?.onboardingComplete === true || profile?.isOnboarded === true) {
-        console.log('[OnboardingWizard] User profile was already complete -> redirecting to analysis');
+    if (profileStatus === 'loaded') {
+      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+      if (isCompleted) {
+        console.log('[OnboardingWizard] User profile is already complete -> redirecting to analysis');
         onComplete?.(profile);
       }
     }
-  }, [profile?.onboardingComplete, profile?.isOnboarded, profileStatus, onComplete]);
+  }, [profile, profileStatus, onComplete]);
 
   const [formData, setFormData] = useState(() => ({
     ...profile,
@@ -505,56 +505,52 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
   const handleContinue = async () => {
     setSaveError(null);
 
-    // Validate current step fields
+    const sanitizedData = {
+      ...formData,
+      gender: formData.gender || 'MALE',
+      nationality: formData.nationality || 'INDIAN',
+      educationLevel: formData.educationLevel || 'UNDERGRADUATE',
+      institutionType: formData.institutionType || 'Government',
+      currentYear: formData.currentYear || 1,
+      admissionYear: formData.admissionYear || 2024,
+      studyMode: formData.studyMode || 'Full-time',
+      class12Stream: formData.class12Stream || 'Science',
+      class12PassingYear: formData.class12PassingYear || 2024,
+      intendedAdmissionYear: formData.intendedAdmissionYear || 2026,
+      incomeSource: formData.incomeSource || 'SALARY',
+      familyMembersCount: formData.familyMembersCount || 4,
+      earningMembersCount: formData.earningMembersCount !== undefined ? formData.earningMembersCount : 1,
+      incomeCertificateStatus: formData.incomeCertificateStatus || 'YES',
+      category: formData.category || 'GENERAL',
+      domicileState: formData.domicileState || 'Tamil Nadu',
+      applicationType: formData.applicationType || 'FRESH'
+    };
+
+    setFormData(sanitizedData);
+
     if (currentStep <= 5) {
-      if (!validateStep(currentStep, formData)) return;
+      if (!validateStep(currentStep, sanitizedData)) return;
     }
 
     if (currentStep < 5) {
       const nextStep = currentStep + 1;
-
-      // 1. Advance step in form state
+      // 1. Instant optimistic state transition
+      updateProfile(sanitizedData);
       setCurrentStep(nextStep);
       setFieldErrors({});
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // 2. Persist draft progress with onboardingComplete explicitly FALSE
-      const draftData = {
-        ...formData,
-        onboardingStep: nextStep,
-        onboardingComplete: false,
-        isOnboarded: false
-      };
-      updateProfile(draftData);
-      profileService.saveOnboardingStep(nextStep, draftData).catch((err) => {
+      // 2. Non-blocking asynchronous database sync in background
+      profileService.saveOnboardingStep(nextStep, sanitizedData).catch((err) => {
         console.warn('[OnboardingWizard] Background step save notice:', err.message);
       });
     } else if (currentStep === 5) {
       const completedData = {
-        ...formData,
-        gender: formData.gender || 'MALE',
-        nationality: formData.nationality || 'INDIAN',
-        educationLevel: formData.educationLevel || 'UNDERGRADUATE',
-        institutionType: formData.institutionType || 'Government',
-        currentYear: formData.currentYear || 1,
-        admissionYear: formData.admissionYear || 2024,
-        studyMode: formData.studyMode || 'Full-time',
-        class12Stream: formData.class12Stream || 'Science',
-        class12PassingYear: formData.class12PassingYear || 2024,
-        intendedAdmissionYear: formData.intendedAdmissionYear || 2026,
-        incomeSource: formData.incomeSource || 'SALARY',
-        familyMembersCount: formData.familyMembersCount || 4,
-        earningMembersCount: formData.earningMembersCount !== undefined ? formData.earningMembersCount : 1,
-        incomeCertificateStatus: formData.incomeCertificateStatus || 'YES',
-        category: formData.category || 'GENERAL',
-        domicileState: formData.domicileState || 'Tamil Nadu',
-        applicationType: formData.applicationType || 'FRESH',
+        ...sanitizedData,
         isOnboarded: true,
         onboardingComplete: true,
         onboardingStep: 5
       };
-
-      setFormData(completedData);
 
       // 1. Optimistically update local profile state immediately
       updateProfile(completedData);
@@ -617,7 +613,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
 
         {/* ── MAIN TWO-COLUMN ONBOARDING GRID (45% Left / 55% Right) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-          
+
           {/* LEFT COLUMN: PROGRESS TIMELINE */}
           <aside className="lg:col-span-5 w-full">
             <h1 className="text-2xl sm:text-3xl lg:text-[30px] font-bold text-slate-900 leading-[1.15] tracking-[-0.025em]">
@@ -651,9 +647,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                       onClick={() => {
                         if (isCompleted) jumpToStep(step.id);
                       }}
-                      className={`relative flex items-start gap-3.5 pb-5 sm:pb-6 last:pb-0 ${
-                        isCompleted ? 'cursor-pointer group' : ''
-                      }`}
+                      className={`relative flex items-start gap-3.5 pb-5 sm:pb-6 last:pb-0 ${isCompleted ? 'cursor-pointer group' : ''
+                        }`}
                     >
                       {/* Step Circle */}
                       <div className="relative z-10 flex-shrink-0 pt-0.5">
@@ -678,26 +673,24 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                       <div className="flex-1 min-w-0 pt-0.5">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`text-xs sm:text-sm font-semibold leading-none transition-colors ${
-                              isCurrent
+                            className={`text-xs sm:text-sm font-semibold leading-none transition-colors ${isCurrent
                                 ? 'text-blue-600'
                                 : isCompleted
-                                ? 'text-slate-900 group-hover:text-blue-600'
-                                : 'text-slate-500'
-                            }`}
+                                  ? 'text-slate-900 group-hover:text-blue-600'
+                                  : 'text-slate-500'
+                              }`}
                           >
                             0{step.id} {step.title}
                           </span>
                         </div>
 
                         <p
-                          className={`text-[11.5px] sm:text-xs mt-1 leading-snug transition-colors ${
-                            isCurrent
+                          className={`text-[11.5px] sm:text-xs mt-1 leading-snug transition-colors ${isCurrent
                               ? 'text-slate-500'
                               : isCompleted
-                              ? 'text-slate-400'
-                              : 'text-slate-400'
-                          }`}
+                                ? 'text-slate-400'
+                                : 'text-slate-400'
+                            }`}
                         >
                           {step.subtitle}
                         </p>
@@ -719,7 +712,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                 </div>
               )}
               <AnimatePresence mode="wait">
-                
+
                 {/* ── STEP 1: PERSONAL DETAILS ─────────────────────────────────────── */}
                 {currentStep === 1 && (
                   <motion.div
@@ -752,9 +745,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                           value={formData.fullName || ''}
                           onChange={(e) => handleChange('fullName', e.target.value)}
                           placeholder="e.g. Mohamed Imraan"
-                          className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 ${
-                            fieldErrors.fullName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                          }`}
+                          className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 ${fieldErrors.fullName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                            }`}
                         />
                         {fieldErrors.fullName && (
                           <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -773,9 +765,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                             type="date"
                             value={formData.dob || ''}
                             onChange={(e) => handleChange('dob', e.target.value)}
-                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                              fieldErrors.dob ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                            }`}
+                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.dob ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                              }`}
                           />
                           {fieldErrors.dob && (
                             <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -825,9 +816,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                             value={formData.mobile || ''}
                             onChange={(e) => handleChange('mobile', e.target.value)}
                             placeholder="e.g. 9876543210"
-                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                              fieldErrors.mobile ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                            }`}
+                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.mobile ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                              }`}
                           />
                           {fieldErrors.mobile && (
                             <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -847,9 +837,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                           value={formData.email || ''}
                           onChange={(e) => handleChange('email', e.target.value)}
                           placeholder="student@example.com"
-                          className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 ${
-                            fieldErrors.email ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                          }`}
+                          className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 ${fieldErrors.email ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                            }`}
                         />
                         {fieldErrors.email && (
                           <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -899,11 +888,10 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                               key={lvl.id}
                               type="button"
                               onClick={() => handleEduLevelChange(lvl.id)}
-                              className={`p-3 rounded-[10px] text-left border transition-all cursor-pointer ${
-                                eduLevel === lvl.id
+                              className={`p-3 rounded-[10px] text-left border transition-all cursor-pointer ${eduLevel === lvl.id
                                   ? 'bg-blue-50/70 border-blue-600 text-blue-950 ring-1 ring-blue-600'
                                   : 'bg-white border-[#CBD5E1] text-slate-700 hover:border-slate-400'
-                              }`}
+                                }`}
                             >
                               <span className="text-[13.5px] font-bold block leading-tight">{lvl.label}</span>
                               <span className="text-[11px] text-slate-500 block mt-0.5">{lvl.desc}</span>
@@ -926,9 +914,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.class10Percentage || ''}
                                 onChange={(e) => handleChange('class10Percentage', parseFloat(e.target.value))}
                                 placeholder="e.g. 88.5"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.class10Percentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.class10Percentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.class10Percentage && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -947,9 +934,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.class12Percentage || ''}
                                 onChange={(e) => handleChange('class12Percentage', parseFloat(e.target.value))}
                                 placeholder="e.g. 92.4"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.class12Percentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.class12Percentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.class12Percentage && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1065,9 +1051,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.institutionName || ''}
                                 onChange={(e) => handleChange('institutionName', e.target.value)}
                                 placeholder="e.g. Govt Polytechnic Pune"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.institutionName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.institutionName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.institutionName && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1165,9 +1150,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.diplomaScore || ''}
                                 onChange={(e) => handleChange('diplomaScore', parseFloat(e.target.value))}
                                 placeholder="e.g. 82.5 or 8.4"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.diplomaScore ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.diplomaScore ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.diplomaScore && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1234,9 +1218,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.institutionName || ''}
                                 onChange={(e) => handleChange('institutionName', e.target.value)}
                                 placeholder="e.g. VJTI Mumbai / Delhi University"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.institutionName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.institutionName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.institutionName && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1337,9 +1320,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.class12Percentage || ''}
                                 onChange={(e) => handleChange('class12Percentage', parseFloat(e.target.value))}
                                 placeholder="e.g. 88.6"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.class12Percentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.class12Percentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.class12Percentage && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1358,9 +1340,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.cgpa || ''}
                                 onChange={(e) => handleChange('cgpa', parseFloat(e.target.value))}
                                 placeholder="e.g. 8.45"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.cgpa ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.cgpa ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.cgpa && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1427,9 +1408,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.institutionName || ''}
                                 onChange={(e) => handleChange('institutionName', e.target.value)}
                                 placeholder="e.g. IIT Bombay / IIM Ahmedabad"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.institutionName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.institutionName ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.institutionName && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1513,9 +1493,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.undergraduateDegree || ''}
                                 onChange={(e) => handleChange('undergraduateDegree', e.target.value)}
                                 placeholder="e.g. B.Tech / B.Sc"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.undergraduateDegree ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.undergraduateDegree ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.undergraduateDegree && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1534,9 +1513,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.undergraduateCgpa || ''}
                                 onChange={(e) => handleChange('undergraduateCgpa', parseFloat(e.target.value))}
                                 placeholder="e.g. 8.2 or 78%"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.undergraduateCgpa ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.undergraduateCgpa ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.undergraduateCgpa && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1555,9 +1533,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.cgpa || ''}
                                 onChange={(e) => handleChange('cgpa', parseFloat(e.target.value))}
                                 placeholder="e.g. 8.70"
-                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.cgpa ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.cgpa ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.cgpa && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1611,9 +1588,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                               handleChange('annualIncome', val);
                             }}
                             placeholder="e.g. 220000"
-                            className={`w-full h-[46px] pl-8 pr-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                              fieldErrors.annualIncome ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                            }`}
+                            className={`w-full h-[46px] pl-8 pr-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.annualIncome ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                              }`}
                           />
                         </div>
                         {fieldErrors.annualIncome ? (
@@ -1692,9 +1668,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                             min="1"
                             value={formData.familyMembersCount ?? 4}
                             onChange={(e) => handleChange('familyMembersCount', parseInt(e.target.value, 10))}
-                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                              fieldErrors.familyMembersCount ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                            }`}
+                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.familyMembersCount ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                              }`}
                           />
                           {fieldErrors.familyMembersCount && (
                             <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1712,9 +1687,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                             min="0"
                             value={formData.earningMembersCount ?? 1}
                             onChange={(e) => handleChange('earningMembersCount', parseInt(e.target.value, 10))}
-                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                              fieldErrors.earningMembersCount ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                            }`}
+                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.earningMembersCount ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                              }`}
                           />
                           {fieldErrors.earningMembersCount && (
                             <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1810,11 +1784,10 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                               key={cat.id}
                               type="button"
                               onClick={() => handleChange('category', cat.id)}
-                              className={`py-2.5 px-2 rounded-[10px] text-[13.5px] font-semibold border text-center transition-all cursor-pointer ${
-                                formData.category === cat.id
+                              className={`py-2.5 px-2 rounded-[10px] text-[13.5px] font-semibold border text-center transition-all cursor-pointer ${formData.category === cat.id
                                   ? 'bg-blue-50/70 border-blue-600 text-blue-950 ring-1 ring-blue-600'
                                   : 'bg-white border-[#CBD5E1] text-slate-700 hover:border-slate-400'
-                              }`}
+                                }`}
                             >
                               {cat.label}
                             </button>
@@ -1950,9 +1923,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                             onChange={(e) => handleChange('currentPincode', e.target.value)}
                             placeholder="e.g. 400050"
                             maxLength={6}
-                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                              fieldErrors.currentPincode ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                            }`}
+                            className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.currentPincode ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                              }`}
                           />
                           {fieldErrors.currentPincode && (
                             <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -1992,7 +1964,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                         <label className="block text-[13px] font-semibold text-slate-700 mb-2.5">
                           Special eligibility criteria
                         </label>
-                        
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           {[
                             { id: 'hasDisability', title: 'Person with Disability (PwD)' },
@@ -2010,18 +1982,16 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 key={item.id}
                                 type="button"
                                 onClick={() => toggleSpecialCondition(item.id)}
-                                className={`p-3 px-3.5 rounded-[10px] border text-left cursor-pointer transition-all flex items-center gap-3 ${
-                                  isChecked
+                                className={`p-3 px-3.5 rounded-[10px] border text-left cursor-pointer transition-all flex items-center gap-3 ${isChecked
                                     ? 'bg-blue-50/70 border-blue-600 text-blue-950 ring-1 ring-blue-600 font-semibold'
                                     : 'bg-white border-[#CBD5E1] text-slate-700 hover:border-slate-400'
-                                }`}
+                                  }`}
                               >
                                 <div
-                                  className={`w-4 h-4 rounded flex items-center justify-center text-xs flex-shrink-0 transition-colors ${
-                                    isChecked
+                                  className={`w-4 h-4 rounded flex items-center justify-center text-xs flex-shrink-0 transition-colors ${isChecked
                                       ? 'bg-blue-600 text-white'
                                       : 'border border-slate-300 bg-white'
-                                  }`}
+                                    }`}
                                 >
                                   {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                                 </div>
@@ -2054,9 +2024,8 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                 value={formData.disabilityPercentage || ''}
                                 onChange={(e) => handleChange('disabilityPercentage', parseFloat(e.target.value))}
                                 placeholder="e.g. 40"
-                                className={`w-full h-[44px] px-3.5 text-[14px] bg-white border rounded-[8px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${
-                                  fieldErrors.disabilityPercentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
-                                }`}
+                                className={`w-full h-[44px] px-3.5 text-[14px] bg-white border rounded-[8px] text-slate-800 placeholder:text-slate-400 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.disabilityPercentage ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'
+                                  }`}
                               />
                               {fieldErrors.disabilityPercentage && (
                                 <p className="text-[12px] text-red-600 font-medium mt-1">
@@ -2293,24 +2262,22 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                             Optional — let us know which documents you already have. You will upload required documents on the official scholarship portal when you apply.
                           </p>
                         </div>
-                        
+
                         <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                           {dynamicDocuments.map((doc) => {
                             const currentStatus = (formData.documentStatuses || {})[doc.id] || (formData.uploadedFiles?.[doc.id] ? 'YES' : 'NOT_SURE');
-                            
+
                             return (
                               <div
                                 key={doc.id}
-                                className={`p-3 px-3.5 rounded-[12px] border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[13px] ${
-                                  currentStatus === 'YES' 
-                                    ? 'bg-emerald-50/50 border-emerald-200 shadow-2xs' 
+                                className={`p-3 px-3.5 rounded-[12px] border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[13px] ${currentStatus === 'YES'
+                                    ? 'bg-emerald-50/50 border-emerald-200 shadow-2xs'
                                     : 'bg-slate-50/80 border-slate-200'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-start gap-2.5 min-w-0">
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                    currentStatus === 'YES' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/70 text-slate-500'
-                                  }`}>
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${currentStatus === 'YES' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/70 text-slate-500'
+                                    }`}>
                                     {currentStatus === 'YES' ? (
                                       <FileCheck className="w-4 h-4" />
                                     ) : (
@@ -2327,7 +2294,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                     </span>
                                   </div>
                                 </div>
-                                
+
                                 <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0">
                                   {[
                                     { id: 'YES', label: 'Yes' },
@@ -2345,15 +2312,14 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                           documentStatuses: currentStatuses
                                         }));
                                       }}
-                                      className={`px-3 py-1 rounded-lg text-[12px] font-bold border transition-all cursor-pointer ${
-                                        currentStatus === opt.id
+                                      className={`px-3 py-1 rounded-lg text-[12px] font-bold border transition-all cursor-pointer ${currentStatus === opt.id
                                           ? opt.id === 'YES'
                                             ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
                                             : opt.id === 'NO'
-                                            ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
-                                            : 'bg-slate-700 border-slate-700 text-white shadow-xs'
+                                              ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                                              : 'bg-slate-700 border-slate-700 text-white shadow-xs'
                                           : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
-                                      }`}
+                                        }`}
                                     >
                                       {opt.label}
                                     </button>
@@ -2429,7 +2395,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                               {item.desc}
                             </span>
                           </div>
-                          
+
                           <button
                             type="button"
                             onClick={() => jumpToStep(item.step)}
