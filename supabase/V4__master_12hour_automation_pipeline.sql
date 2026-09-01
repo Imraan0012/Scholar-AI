@@ -3,12 +3,12 @@
 -- Production-Safe Idempotent Schema Migration
 -- =============================================================================
 
--- 1. SCHOLARSHIP SCAN RUNS (12-Hour Automated Master Pipeline Execution History)
-CREATE TABLE IF NOT EXISTS scholarship_scan_runs (
+-- 1. SCHOLARSHIP SCAN RUNS TABLE (12-Hour Automated Master Pipeline Execution History)
+CREATE TABLE IF NOT EXISTS public.scholarship_scan_runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMP WITH TIME ZONE,
-    status VARCHAR(50) NOT NULL DEFAULT 'RUNNING' CHECK (status IN ('QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED')),
+    status VARCHAR(50) NOT NULL DEFAULT 'RUNNING',
     sources_total INTEGER NOT NULL DEFAULT 0,
     sources_checked INTEGER NOT NULL DEFAULT 0,
     sources_successful INTEGER NOT NULL DEFAULT 0,
@@ -27,27 +27,14 @@ CREATE TABLE IF NOT EXISTS scholarship_scan_runs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. SCHOLARSHIPS DEADLINE & LIFECYCLE EXTENSIONS (Idempotent column additions)
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='scholarships' AND column_name='status') THEN
-        ALTER TABLE scholarships ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('NOT_YET_OPEN', 'OPEN', 'CLOSING_SOON', 'CLOSED', 'YEAR_ROUND', 'UNKNOWN'));
-    END IF;
+-- 2. SCHOLARSHIPS DEADLINE & LIFECYCLE EXTENSIONS (Idempotent Column Additions)
+ALTER TABLE public.scholarships ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'OPEN';
+ALTER TABLE public.scholarships ADD COLUMN IF NOT EXISTS application_open_date DATE;
+ALTER TABLE public.scholarships ADD COLUMN IF NOT EXISTS application_deadline DATE;
+ALTER TABLE public.scholarships ADD COLUMN IF NOT EXISTS is_deadline_extended BOOLEAN DEFAULT false;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='scholarships' AND column_name='application_open_date') THEN
-        ALTER TABLE scholarships ADD COLUMN application_open_date DATE;
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='scholarships' AND column_name='application_deadline') THEN
-        ALTER TABLE scholarships ADD COLUMN application_deadline DATE;
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='scholarships' AND column_name='is_deadline_extended') THEN
-        ALTER TABLE scholarships ADD COLUMN is_deadline_extended BOOLEAN DEFAULT false;
-    END IF;
-END $$;
-
--- 3. INDEXES FOR PERFORMANCE
-CREATE INDEX IF NOT EXISTS idx_scholarship_scan_runs_created ON scholarship_scan_runs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_scholarships_status ON scholarships(status);
-CREATE INDEX IF NOT EXISTS idx_scholarships_deadline ON scholarships(application_deadline);
+-- 3. INDEXES FOR QUERY PERFORMANCE
+CREATE INDEX IF NOT EXISTS idx_scholarship_scan_runs_created ON public.scholarship_scan_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scholarship_scan_runs_status ON public.scholarship_scan_runs(status);
+CREATE INDEX IF NOT EXISTS idx_scholarships_status ON public.scholarships(status);
+CREATE INDEX IF NOT EXISTS idx_scholarships_deadline ON public.scholarships(application_deadline);
