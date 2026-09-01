@@ -158,4 +158,35 @@ class AdminSyncControllerTest {
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         verifyNoInteractions(scholarshipRepository);
     }
+
+    @Test
+    void testPublishSafeMissingSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.publishSafeCandidates(null, "ADMIN_REVIEWER");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        verifyNoInteractions(candidateRepository);
+    }
+
+    @Test
+    void testPublishSafeWrongSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.publishSafeCandidates("wrong-secret-token", "ADMIN_REVIEWER");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+        verifyNoInteractions(candidateRepository);
+    }
+
+    @Test
+    void testPublishSafeCorrectSecretSucceeds() {
+        when(candidateRepository.findByStatus("PENDING")).thenReturn(Collections.emptyList());
+
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.publishSafeCandidates(CONFIGURED_SECRET, "ADMIN_REVIEWER");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(true, response.getBody().isSuccess());
+    }
 }

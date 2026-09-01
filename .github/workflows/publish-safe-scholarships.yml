@@ -40,21 +40,33 @@ jobs:
 
             echo "Response HTTP Status: $HTTP_STATUS"
 
-            if [ "$HTTP_STATUS" -eq 200 ]; then
+            if [ "$HTTP_STATUS" = "200" ]; then
               echo "Candidate publication completed successfully."
               echo "================ PUBLICATION METRICS ================"
               echo "$BODY"
               echo "====================================================="
               SUCCESS=1
               break
-            elif [ "$HTTP_STATUS" -eq 401 ] || [ "$HTTP_STATUS" -eq 403 ]; then
+            elif [ "$HTTP_STATUS" = "400" ]; then
+              echo "::error::Client Bad Request (HTTP 400). Payload or parameters are invalid."
+              echo "Response Body: $BODY"
+              exit 1
+            elif [ "$HTTP_STATUS" = "401" ] || [ "$HTTP_STATUS" = "403" ]; then
               echo "::error::Authentication failed with HTTP $HTTP_STATUS. Please verify SCHEDULER_SECRET."
               echo "Response Body: $BODY"
               exit 1
-            else
-              echo "::warning::Received HTTP $HTTP_STATUS. Render instance may be warming up or building. Waiting $RETRY_DELAY seconds..."
+            elif [ "$HTTP_STATUS" = "404" ]; then
+              echo "::error::Endpoint Not Found (HTTP 404). The Render deployment does not have the publish-safe endpoint yet. Ensure Render has deployed the commit containing this endpoint."
+              echo "Response Body: $BODY"
+              exit 1
+            elif [ "$HTTP_STATUS" = "502" ] || [ "$HTTP_STATUS" = "503" ] || [ "$HTTP_STATUS" = "504" ] || [ "$HTTP_STATUS" = "000" ] || [ -z "$HTTP_STATUS" ]; then
+              echo "::warning::Received transient response HTTP ${HTTP_STATUS:-timeout/network-error}. Render instance may be warming up or restarting. Waiting $RETRY_DELAY seconds..."
               echo "Response Body: $BODY"
               sleep $RETRY_DELAY
+            else
+              echo "::error::Received unexpected HTTP $HTTP_STATUS."
+              echo "Response Body: $BODY"
+              exit 1
             fi
           done
 
