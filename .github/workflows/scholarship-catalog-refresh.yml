@@ -1,0 +1,100 @@
+name: Scholar AI 12-Hour Scholarship Master Refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs every 12 hours automatically at 00:00 and 12:00 UTC
+    - cron: '0 */12 * * *'
+
+jobs:
+  refresh-catalog:
+    name: Execute 12-Hour Master Scholarship Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Health-Check Render Backend & Trigger Master Pipeline
+        env:
+          BACKEND_URL: ${{ secrets.PROD_API_URL || 'https://scholar-ai-l8uc.onrender.com' }}
+          SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
+        run: |
+          echo "=========================================================="
+          echo " Scholar AI — 12-Hour Automated Master Catalog Refresh"
+          echo "=========================================================="
+
+          if [ -z "$SCHEDULER_SECRET" ]; then
+            echo "::error::SCHEDULER_SECRET repository secret is not configured."
+            exit 1
+          fi
+
+          echo "Phase 1: Waking up Render backend and checking health..."
+          HEALTH_URL="${BACKEND_URL}/api/health"
+          for h in $(seq 1 6); do
+            H_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" --max-time 15 || echo "000")
+            echo "Health probe $h: HTTP $H_STATUS"
+            if [ "$H_STATUS" -eq 200 ]; then
+              echo "Render backend is UP and responsive."
+              break
+            fi
+            sleep 10
+          done
+
+          echo "Phase 2: Calling Master Automated Pipeline Endpoint..."
+          ENDPOINT="${BACKEND_URL}/api/admin/pipeline/run"
+          MAX_RETRIES=3
+          RETRY_DELAY=15
+          SUCCESS=0
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES: Executing master pipeline..."
+            RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$ENDPOINT" \
+              -H "Content-Type: application/json" \
+              -H "X-Scheduler-Secret: ${SCHEDULER_SECRET}" \
+              --max-time 90)
+
+            HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\r' | sed -n -e 's/^HTTP_STATUS://p')
+            BODY=$(echo "$RESPONSE" | sed -e '/HTTP_STATUS:/d')
+
+            echo "Response HTTP Status: $HTTP_STATUS"
+
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              IS_SUCCESS=$(echo "$BODY" | grep -o '"success":\s*true' || true)
+
+              if [ -n "$IS_SUCCESS" ]; then
+                echo "=========================================================="
+                echo " MASTER PIPELINE EXECUTION SUMMARY"
+                echo "=========================================================="
+                echo "$BODY" | grep -o '"status":\s*"[^"]*"' || true
+                echo "$BODY" | grep -o '"liveScholarshipCount":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"sourcesChecked":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"sourcesSuccessful":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"rawCandidatesDiscovered":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"duplicatesDetected":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"newCandidatesStaged":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"autoPublishedCount":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"scholarshipsUpdated":\s*[0-9]*' || true
+                echo "$BODY" | grep -o '"deadlinesUpdated":\s*[0-9]*' || true
+                echo "=========================================================="
+                SUCCESS=1
+                break
+              else
+                echo "::error::Pipeline returned HTTP 200 but payload indicated failure."
+                echo "$BODY"
+                exit 1
+              fi
+            elif [ "$HTTP_STATUS" -eq 401 ] || [ "$HTTP_STATUS" -eq 403 ] || [ "$HTTP_STATUS" -eq 404 ]; then
+              echo "::error::Fatal client error HTTP $HTTP_STATUS. Exiting immediately without retrying."
+              echo "Response: $BODY"
+              exit 1
+            else
+              echo "::warning::Received transient status HTTP $HTTP_STATUS. Waiting $RETRY_DELAY seconds..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "::error::Master pipeline failed after $MAX_RETRIES attempts."
+            exit 1
+          fi

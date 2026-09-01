@@ -71,6 +71,18 @@ public class Scholarship {
     @Column(name = "official_scheme_id", length = 100)
     private String officialSchemeId;
 
+    @Column(name = "status", length = 30)
+    private String status = "OPEN"; // OPEN, CLOSING_SOON, CLOSED, NOT_YET_OPEN, UPCOMING, YEAR_ROUND
+
+    @Column(name = "application_open_date")
+    private java.time.LocalDate applicationOpenDate;
+
+    @Column(name = "application_deadline")
+    private java.time.LocalDate applicationDeadline;
+
+    @Column(name = "is_deadline_extended")
+    private Boolean isDeadlineExtended = false;
+
     @Column(name = "content_hash", length = 64)
     private String contentHash;
 
@@ -168,6 +180,18 @@ public class Scholarship {
 
     public String getOfficialSchemeId() { return officialSchemeId; }
     public void setOfficialSchemeId(String officialSchemeId) { this.officialSchemeId = officialSchemeId; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public java.time.LocalDate getApplicationOpenDate() { return applicationOpenDate; }
+    public void setApplicationOpenDate(java.time.LocalDate applicationOpenDate) { this.applicationOpenDate = applicationOpenDate; }
+
+    public java.time.LocalDate getApplicationDeadline() { return applicationDeadline; }
+    public void setApplicationDeadline(java.time.LocalDate applicationDeadline) { this.applicationDeadline = applicationDeadline; }
+
+    public Boolean getIsDeadlineExtended() { return isDeadlineExtended; }
+    public void setIsDeadlineExtended(Boolean isDeadlineExtended) { this.isDeadlineExtended = isDeadlineExtended; }
 
     public String getContentHash() { return contentHash; }
     public void setContentHash(String contentHash) { this.contentHash = contentHash; }

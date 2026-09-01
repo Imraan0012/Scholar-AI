@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,13 +28,18 @@ public class AdminSyncController {
 
     private final ScholarshipSyncService syncService;
     private final ScholarshipDiscoveryService discoveryService;
+    private final com.scholarai.backend.service.ScholarshipMasterPipelineService masterPipelineService;
 
     @Value("${scheduler.secret:${SCHEDULER_SECRET:}}")
     private String schedulerSecret;
 
-    public AdminSyncController(ScholarshipSyncService syncService, ScholarshipDiscoveryService discoveryService) {
+    public AdminSyncController(
+            ScholarshipSyncService syncService,
+            ScholarshipDiscoveryService discoveryService,
+            com.scholarai.backend.service.ScholarshipMasterPipelineService masterPipelineService) {
         this.syncService = syncService;
         this.discoveryService = discoveryService;
+        this.masterPipelineService = masterPipelineService;
     }
 
     private boolean isAuthorized(String headerSecret) {
@@ -227,5 +233,55 @@ public class AdminSyncController {
         }
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("Review not found or could not be applied"));
+    }
+
+    /**
+     * Executes the comprehensive 12-hour master automated discovery, deadline tracking,
+     * deduplication, and auto-publication pipeline.
+     */
+    @PostMapping({"/pipeline/run", "/scan/run", "/discovery/master-run"})
+    public ResponseEntity<ApiResponse<Map<String, Object>>> runMasterPipeline(
+            @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret,
+            @RequestParam(defaultValue = "12_HOUR_SCHEDULER") String triggeredBy) {
+
+        if (!isAuthorized(headerSecret)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Forbidden: Invalid or missing X-Scheduler-Secret header"));
+        }
+
+        Map<String, Object> report = masterPipelineService.executeMasterPipeline(triggeredBy);
+        return ResponseEntity.ok(ApiResponse.success("Master 12-hour pipeline completed successfully", report));
+    }
+
+    /**
+     * Lists recent scan run histories.
+     */
+    @GetMapping({"/pipeline/runs", "/scan/runs"})
+    public ResponseEntity<ApiResponse<List<com.scholarai.backend.entity.ScholarshipScanRun>>> getScanRuns(
+            @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret) {
+
+        if (!isAuthorized(headerSecret)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Forbidden: Invalid or missing X-Scheduler-Secret header"));
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(masterPipelineService.getRecentScanRuns()));
+    }
+
+    /**
+     * Returns the latest master scan run summary.
+     */
+    @GetMapping({"/pipeline/latest", "/scan/latest"})
+    public ResponseEntity<ApiResponse<com.scholarai.backend.entity.ScholarshipScanRun>> getLatestScanRun(
+            @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret) {
+
+        if (!isAuthorized(headerSecret)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Forbidden: Invalid or missing X-Scheduler-Secret header"));
+        }
+
+        return masterPipelineService.getLatestScanRun()
+                .map(run -> ResponseEntity.ok(ApiResponse.success(run)))
+                .orElse(ResponseEntity.ok(ApiResponse.success(null)));
     }
 }

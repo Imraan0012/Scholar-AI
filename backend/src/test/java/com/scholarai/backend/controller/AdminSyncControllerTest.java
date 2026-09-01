@@ -29,6 +29,7 @@ class AdminSyncControllerTest {
     private ScholarshipSourceRepository sourceRepository;
     private ScholarshipSyncService syncService;
     private ScholarshipDiscoveryService discoveryService;
+    private com.scholarai.backend.service.ScholarshipMasterPipelineService masterPipelineService;
     private AdminSyncController controller;
 
     private static final String CONFIGURED_SECRET = "test-env-scheduler-secret-2026";
@@ -39,14 +40,18 @@ class AdminSyncControllerTest {
         reviewRepository = mock(ScholarshipUpdateReviewRepository.class);
         candidateRepository = mock(ScholarshipDiscoveryCandidateRepository.class);
         sourceRepository = mock(ScholarshipSourceRepository.class);
+        com.scholarai.backend.repository.ScholarshipScanRunRepository scanRunRepo = mock(com.scholarai.backend.repository.ScholarshipScanRunRepository.class);
         ObjectMapper objectMapper = new ObjectMapper();
 
         syncService = new ScholarshipSyncService(scholarshipRepository, reviewRepository, objectMapper);
         discoveryService = new ScholarshipDiscoveryService(
                 Collections.emptyList(), candidateRepository, scholarshipRepository, sourceRepository, syncService, objectMapper
         );
+        masterPipelineService = new com.scholarai.backend.service.ScholarshipMasterPipelineService(
+                Collections.emptyList(), candidateRepository, scholarshipRepository, sourceRepository, scanRunRepo, discoveryService, syncService, objectMapper
+        );
 
-        controller = new AdminSyncController(syncService, discoveryService);
+        controller = new AdminSyncController(syncService, discoveryService, masterPipelineService);
         ReflectionTestUtils.setField(controller, "schedulerSecret", CONFIGURED_SECRET);
     }
 
@@ -115,7 +120,7 @@ class AdminSyncControllerTest {
                 List.of(failingConnector), candidateRepository, scholarshipRepository, sourceRepository, syncService, new ObjectMapper()
         );
 
-        AdminSyncController failingController = new AdminSyncController(syncService, failingDiscoveryService);
+        AdminSyncController failingController = new AdminSyncController(syncService, failingDiscoveryService, masterPipelineService);
         ReflectionTestUtils.setField(failingController, "schedulerSecret", CONFIGURED_SECRET);
 
         ResponseEntity<ApiResponse<Map<String, Object>>> response =
