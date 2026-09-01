@@ -111,8 +111,14 @@ const getScholarshipUrls = (scholarship) => {
 };
 
 // Formats deadline to clean readable format
-const formatDeadline = (dateStr) => {
-  if (!dateStr) return '31 Oct 2026';
+const formatDeadline = (dateStr, status) => {
+  if (!dateStr) {
+    if (status === 'YEAR_ROUND') return 'Year-Round / Rolling';
+    if (status === 'AVAILABILITY_UNVERIFIED' || status === 'UNKNOWN') return 'Availability Unverified';
+    if (status === 'UPCOMING') return 'Upcoming Cycle';
+    if (status === 'CLOSED') return 'Applications Closed';
+    return 'Refer Official Portal';
+  }
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -696,27 +702,27 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
             <div className="space-y-5">
               
               {/* 1. ELIGIBILITY SUMMARY: 4 LARGE COMPACT SUMMARY CARDS */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
                 {/* Card 1: ELIGIBLE */}
                 <div
                   onClick={() => setSelectedFilterTab('ELIGIBLE')}
-                  className={`p-3.5 rounded-xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-2 ${
+                  className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-3 ${
                     selectedFilterTab === 'ELIGIBLE' ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200 hover:border-emerald-300'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
                       ELIGIBLE
                     </span>
-                    <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-3 h-3 stroke-[3]" />
+                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </div>
                   </div>
                   <div>
                     <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
                       {stats.eligible}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1.5 font-medium">
+                    <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships you qualify for
                     </span>
                   </div>
@@ -725,15 +731,15 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                 {/* Card 2: POSSIBLE MATCH */}
                 <div
                   onClick={() => setSelectedFilterTab('POSSIBLE')}
-                  className={`p-3.5 rounded-xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-2 ${
+                  className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-3 ${
                     selectedFilterTab === 'POSSIBLE' ? 'border-amber-500 ring-2 ring-amber-100' : 'border-slate-200 hover:border-amber-300'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
                       POSSIBLE MATCH
                     </span>
-                    <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
                       <AlertCircle className="w-3.5 h-3.5 stroke-[2.5]" />
                     </div>
                   </div>
@@ -741,7 +747,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
                       {stats.possible}
                     </span>
-                    <span className="text-[11px] text-slate-500 block mt-1.5 font-medium">
+                    <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships needing verification
                     </span>
                   </div>
@@ -750,7 +756,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                 {/* Card 3: NOT ELIGIBLE */}
                 <div
                   onClick={() => setSelectedFilterTab('INELIGIBLE')}
-                  className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-3 ${
+                  className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-3 ${
                     selectedFilterTab === 'INELIGIBLE' ? 'border-rose-500 ring-2 ring-rose-100' : 'border-slate-200 hover:border-rose-300'
                   }`}
                 >
@@ -763,10 +769,10 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     </div>
                   </div>
                   <div>
-                    <span className="text-3xl sm:text-4xl font-black text-slate-900 block leading-none">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
                       {stats.ineligible}
                     </span>
-                    <span className="text-xs text-slate-500 block mt-2 font-medium">
+                    <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships you don't qualify for
                     </span>
                   </div>
@@ -775,7 +781,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                 {/* Card 4: TOTAL AVAILABLE */}
                 <div
                   onClick={() => setSelectedFilterTab('ALL')}
-                  className={`p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-3 ${
+                  className={`p-4 sm:p-5 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-sm flex flex-col justify-between space-y-3 ${
                     selectedFilterTab === 'ALL' ? 'border-[#2563EB] ring-2 ring-blue-100' : 'border-slate-200 hover:border-blue-300'
                   }`}
                 >
@@ -788,10 +794,10 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     </div>
                   </div>
                   <div>
-                    <span className="text-3xl sm:text-4xl font-black text-slate-900 block leading-none">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
                       {stats.total}
                     </span>
-                    <span className="text-xs text-slate-500 block mt-2 font-medium">
+                    <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships found for you
                     </span>
                   </div>
@@ -2295,7 +2301,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90">
                   <span className="text-xs text-slate-500 block mb-1 uppercase tracking-wider font-bold">Deadline</span>
                   <span className="text-base font-extrabold text-slate-900">
-                    {formatDeadline(selectedScholarship.scholarship.application_deadline)}
+                    {formatDeadline(selectedScholarship.scholarship.application_deadline, selectedScholarship.scholarship.status)}
                   </span>
                 </div>
               </div>
@@ -2477,7 +2483,7 @@ function ScholarshipCardRef({ data, isSaved, onToggleSave, onViewDetails, onAppl
   const isIneligible = tier === 'INELIGIBLE';
 
   const logoSrc = getScholarshipLogo(scholarship);
-  const formattedDeadline = formatDeadline(scholarship.application_deadline);
+  const formattedDeadline = formatDeadline(scholarship.application_deadline, scholarship.status);
   const { applicationUrl, websiteUrl } = getScholarshipUrls(scholarship);
   const targetUrl = applicationUrl || websiteUrl;
   const buttonText = applicationUrl ? 'Apply Now' : websiteUrl ? 'View Official Website' : 'Application Link Unavailable';

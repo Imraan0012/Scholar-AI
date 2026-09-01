@@ -26,7 +26,7 @@ const getScholarshipUrls = (scholarship) => {
 };
 
 const formatDeadline = (dateStr) => {
-  if (!dateStr) return '31 Oct 2026';
+  if (!dateStr) return 'Refer Official Portal';
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;

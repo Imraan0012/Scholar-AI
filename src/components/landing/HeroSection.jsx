@@ -7,7 +7,13 @@ import TiltCard from '../ui/TiltCard';
 import CounterNumber from '../ui/CounterNumber';
 import MagneticButton from '../ui/MagneticButton';
 
+import { useStudentProfile } from '../../context/StudentProfileContext';
+import MetricCard from '../ui/MetricCard';
+
 export default function HeroSection({ currentUser, onCheckEligibilityClick, onAuthClick }) {
+  const { scholarships } = useStudentProfile();
+  const liveCatalogCount = (scholarships && scholarships.length > 0) ? scholarships.length : 63;
+
   const eligibleWords = [
     "You're Actually Eligible For",
     "Across Verified Indian Grants",
@@ -51,13 +57,13 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Top Tagline Pill with Live Pulse */}
         <motion.div
           variants={itemVariants}
-          className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#101322]/80 border border-indigo-500/30 text-indigo-200 text-xs font-semibold mb-4 shadow-lg shadow-indigo-950/40 hover:border-indigo-400/50 transition-colors"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#101322]/90 border border-indigo-500/30 text-indigo-200 text-xs font-semibold mb-4 shadow-lg shadow-indigo-950/40 hover:border-indigo-400/50 transition-colors select-none"
         >
           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-emerald-400 font-bold">
-            100% Official
+          <span className="text-emerald-400 font-bold tracking-tight">
+            100% Verified
           </span>
-          <span className="text-gray-300">Verified Government & Private Indian Scholarships</span>
+          <span className="text-gray-300">Central, State & Corporate Schemes</span>
         </motion.div>
 
         {/* Main Headline with FlipWords */}
@@ -121,46 +127,54 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Trust Metrics Bar with 3D Tilt Cards & Counter Animation */}
         <motion.div
           variants={itemVariants}
-          className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl w-full"
+          className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 max-w-4xl w-full"
         >
-          <TiltCard
-            maxTilt={8}
-            className="bg-[#0e101c]/80 rounded-xl p-3.5 sm:p-4 border border-white/10 text-center flex flex-col items-center shadow-lg hover:border-indigo-500/40 transition-colors"
-          >
-            <span className="text-lg sm:text-xl font-black text-white">
-              <CounterNumber value={46} suffix="+" duration={2} />
-            </span>
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">Verified Active Scholarships</span>
+          <TiltCard maxTilt={6} className="h-full">
+            <MetricCard
+              theme="dark"
+              size="default"
+              className="h-full"
+              value={<CounterNumber value={liveCatalogCount} suffix="+" duration={2} />}
+              label="Verified Active"
+              subtitle="Scholarships Indexed"
+              accentColor="text-white"
+            />
           </TiltCard>
 
-          <TiltCard
-            maxTilt={8}
-            className="bg-[#0e101c]/80 rounded-xl p-3.5 sm:p-4 border border-white/10 text-center flex flex-col items-center shadow-lg hover:border-emerald-500/40 transition-colors"
-          >
-            <span className="text-lg sm:text-xl font-black text-emerald-400">
-              <CounterNumber prefix="₹" value={1000} suffix=" Cr+" duration={2.2} />
-            </span>
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">Scholarship Funds Tracked</span>
+          <TiltCard maxTilt={6} className="h-full">
+            <MetricCard
+              theme="dark"
+              size="default"
+              className="h-full"
+              value={<CounterNumber prefix="₹" value={1000} suffix=" Cr+" duration={2.2} />}
+              label="Scholarship Funds"
+              subtitle="Annual Value Tracked"
+              accentColor="text-emerald-400"
+            />
           </TiltCard>
 
-          <TiltCard
-            maxTilt={8}
-            className="bg-[#0e101c]/80 rounded-xl p-3.5 sm:p-4 border border-white/10 text-center flex flex-col items-center shadow-lg hover:border-cyan-500/40 transition-colors"
-          >
-            <span className="text-lg sm:text-xl font-black text-cyan-400">
-              <CounterNumber value={28} suffix=" States & UTs" duration={1.8} />
-            </span>
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">State Residence Schemes</span>
+          <TiltCard maxTilt={6} className="h-full">
+            <MetricCard
+              theme="dark"
+              size="default"
+              className="h-full"
+              value={<span className="inline-flex items-baseline gap-1"><CounterNumber value={28} duration={1.8} /><span>States & UTs</span></span>}
+              label="State Quotas"
+              subtitle="Residence Schemes"
+              accentColor="text-cyan-400"
+            />
           </TiltCard>
 
-          <TiltCard
-            maxTilt={8}
-            className="bg-[#0e101c]/80 rounded-xl p-3.5 sm:p-4 border border-white/10 text-center flex flex-col items-center shadow-lg hover:border-indigo-500/40 transition-colors"
-          >
-            <span className="text-lg sm:text-xl font-black text-indigo-400">
-              100% Free
-            </span>
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">For Indian Students</span>
+          <TiltCard maxTilt={6} className="h-full">
+            <MetricCard
+              theme="dark"
+              size="default"
+              className="h-full"
+              value="100% Free"
+              label="For Indian Students"
+              subtitle="Zero Application Fees"
+              accentColor="text-indigo-300"
+            />
           </TiltCard>
         </motion.div>
 
