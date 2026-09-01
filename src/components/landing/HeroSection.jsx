@@ -57,13 +57,13 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
   };
 
   return (
-    <section id="hero" className="relative min-h-[70vh] pt-20 pb-8 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 overflow-hidden z-10">
+    <section id="hero" className="relative min-h-[70vh] pt-20 pb-8 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 overflow-hidden z-10 w-full">
 
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="w-full max-w-4xl flex flex-col items-center"
+        className="w-full max-w-4xl mx-auto flex flex-col items-center"
       >
         {/* Top Tagline Pill with Live Pulse */}
         <motion.div
@@ -132,7 +132,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* 4 Stat Cards Grid (Sleek, compact, balanced dimensions) */}
         <motion.div
           variants={itemVariants}
-          className="mt-6 sm:mt-7 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 max-w-2xl w-full"
+          className="mt-6 sm:mt-7 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 max-w-2xl w-full mx-auto"
         >
           {/* Card 1 */}
           <TiltCard maxTilt={6} className="h-full">
@@ -195,7 +195,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Centered Official Source / Trust Row */}
         <motion.div
           variants={itemVariants}
-          className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-[13px] text-gray-400 font-medium"
+          className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-[13px] text-gray-400 font-medium w-full mx-auto"
         >
           <div className="flex items-center gap-2">
             <Landmark className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
