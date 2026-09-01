@@ -158,9 +158,9 @@ export const StudentProfileProvider = ({ children }) => {
     profileRef.current = profile;
   }, [profile]);
 
-  // ── Scholarship loader (non-blocking) ────────────────────────────────────────
+  // ── Scholarship loader (fetches complete multi-page catalog) ───────────────
   const loadScholarshipsAsync = useCallback(() => {
-    scholarshipService.getScholarships().then(({ scholarships: fetchedList }) => {
+    scholarshipService.getAllScholarships().then(({ scholarships: fetchedList }) => {
       if (fetchedList && fetchedList.length > 0) {
         setScholarships(fetchedList);
       }
@@ -169,7 +169,7 @@ export const StudentProfileProvider = ({ children }) => {
     });
   }, []);
 
-  // Fetch live scholarship catalog on initial app mount
+  // Fetch live full scholarship catalog on initial app mount
   useEffect(() => {
     loadScholarshipsAsync();
   }, [loadScholarshipsAsync]);

@@ -113,6 +113,10 @@ export const scholarshipService = {
         return {
           scholarships: formatted,
           totalCount: data.totalElements || formatted.length,
+          totalElements: data.totalElements || formatted.length,
+          totalPages: data.totalPages || 1,
+          currentPage: data.currentPage !== undefined ? data.currentPage : page,
+          pageSize: data.pageSize || size,
           fromBackend: true
         };
       }
@@ -137,11 +141,96 @@ export const scholarshipService = {
       );
     }
 
+    const start = page * size;
+    const paginated = list.slice(start, start + size);
+
     return {
-      scholarships: list,
+      scholarships: paginated.length > 0 ? paginated : list,
       totalCount: list.length,
+      totalElements: list.length,
+      totalPages: Math.ceil(list.length / size) || 1,
+      currentPage: page,
+      pageSize: size,
       fromBackend: false
     };
+  },
+
+  /**
+   * Fetches the entire published scholarship catalog across all paginated pages.
+   * Ensures no truncation occurs regardless of catalog size (63, 100, 300+ items).
+   */
+  async getAllScholarships(options = {}) {
+    const pageSize = options.size || 50;
+    
+    try {
+      // 1. Fetch first page (page 0)
+      const firstPage = await this.getScholarships({
+        ...options,
+        page: 0,
+        size: pageSize
+      });
+
+      if (!firstPage || !Array.isArray(firstPage.scholarships)) {
+        throw new Error('Could not retrieve initial scholarship catalog page.');
+      }
+
+      let allRaw = [...firstPage.scholarships];
+      const totalPages = firstPage.totalPages || 1;
+      const totalElements = firstPage.totalElements || allRaw.length;
+
+      // 2. Fetch all remaining pages in parallel if more than 1 page
+      if (totalPages > 1) {
+        const pagePromises = [];
+        for (let p = 1; p < totalPages; p++) {
+          pagePromises.push(
+            this.getScholarships({
+              ...options,
+              page: p,
+              size: pageSize
+            })
+          );
+        }
+
+        const remainingPageResponses = await Promise.all(pagePromises);
+        for (const pageRes of remainingPageResponses) {
+          if (!pageRes || !Array.isArray(pageRes.scholarships)) {
+            throw new Error('Failed to fetch complete scholarship catalog across all pages.');
+          }
+          allRaw.push(...pageRes.scholarships);
+        }
+      }
+
+      // 3. Deduplicate by unique stable scholarship ID
+      const seenIds = new Set();
+      const uniqueList = [];
+      for (const item of allRaw) {
+        const id = item.id;
+        if (id && !seenIds.has(id)) {
+          seenIds.add(id);
+          uniqueList.push(item);
+        } else if (!id) {
+          uniqueList.push(item);
+        }
+      }
+
+      return {
+        scholarships: uniqueList,
+        totalCount: uniqueList.length,
+        totalElements,
+        totalPages,
+        fromBackend: firstPage.fromBackend
+      };
+    } catch (err) {
+      console.warn('[ScholarshipService] getAllScholarships backend error, falling back to complete local registry:', err.message);
+      const fallbackList = MASTER_SCHOLARSHIP_REGISTRY.map(normalizeScholarship);
+      return {
+        scholarships: fallbackList,
+        totalCount: fallbackList.length,
+        totalElements: fallbackList.length,
+        totalPages: 1,
+        fromBackend: false
+      };
+    }
   },
 
   async getScholarshipById(id) {
