@@ -172,24 +172,28 @@ function MainAppContent() {
         return;
       }
 
-      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded || profile?.onboardingStep >= 5) || firstIncomplete === 6;
+      // Completion is determined SOLELY by the explicit persisted flag.
+      // A profile row with filled fields but onboardingComplete=false is INCOMPLETE.
+      const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
 
       // Guard /onboarding: If user has a completed profile, redirect them away to /dashboard
-      if (view === 'onboarding' && isCompleted) {
-        console.log('[RouteGuard] authState=authenticated profileStatus=loaded onboardingComplete=true view=onboarding decision=REDIRECT_DASHBOARD_FROM_ONBOARDING');
-        setView('dashboard');
-        if (window.location.pathname !== '/dashboard') {
-          window.history.replaceState(null, '', '/dashboard');
+      if (view === 'onboarding') {
+        if (isCompleted) {
+          console.log('[ROUTE_GUARD]\npath=/onboarding\ndecision=DASHBOARD\nreason=profile_complete');
+          setView('dashboard');
+          if (window.location.pathname !== '/dashboard') {
+            window.history.replaceState(null, '', '/dashboard');
+          }
+          return;
+        } else {
+          console.log('[ROUTE_GUARD]\npath=/onboarding\ndecision=ALLOW\nreason=profile_incomplete');
         }
-        return;
       }
 
       // Guard protected views (dashboard, results, analysis)
       if (['dashboard', 'results', 'analysis'].includes(view)) {
-        // Only redirect brand new accounts where profile is confirmed absent from database
-        if (profileStatus === 'not_found') {
-          console.log('[RouteGuard] authState=authenticated profileStatus=not_found view=' + view + ' decision=REDIRECT_ONBOARDING');
+        if (profileStatus === 'not_found' || !isCompleted) {
+          console.log(`[ROUTE_GUARD]\npath=/${view}\ndecision=ONBOARDING\nreason=profile_incomplete`);
           setView('onboarding');
           if (window.location.pathname !== '/onboarding') {
             window.history.replaceState(null, '', '/onboarding');
@@ -197,17 +201,7 @@ function MainAppContent() {
           return;
         }
 
-        // If profile was loaded from database and explicitly incomplete (user never finished onboarding)
-        if (profileStatus === 'loaded' && !isCompleted) {
-          console.log('[RouteGuard] authState=authenticated profileStatus=loaded onboardingComplete=false view=' + view + ' decision=REDIRECT_ONBOARDING');
-          setView('onboarding');
-          if (window.location.pathname !== '/onboarding') {
-            window.history.replaceState(null, '', '/onboarding');
-          }
-          return;
-        }
-
-        console.log('[RouteGuard] authState=authenticated profileStatus=loaded onboardingComplete=true view=' + view + ' decision=ALLOW');
+        console.log(`[ROUTE_GUARD]\npath=/${view}\ndecision=ALLOW\nreason=profile_complete`);
       }
     }
   }, [view, currentUser, authLoading, profileStatus, profile?.onboardingComplete, profile?.isOnboarded, profile?.onboardingStep, profile]);
@@ -235,15 +229,20 @@ function MainAppContent() {
       setUserNotification(null);
     }, 3000);
 
+    const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
+
     // SIGN UP FLOW: A newly registered user goes to onboarding step 1
     if (authMode === 'signup') {
       navigateToView('onboarding');
       return;
     }
 
-    // SIGN IN FLOW: Navigate immediately to dashboard.
-    // The onboarding guard will only redirect if database confirms profile is not_found or incomplete.
-    navigateToView('dashboard');
+    // SIGN IN FLOW: Navigate to dashboard ONLY if completed; otherwise resume onboarding
+    if (isCompleted) {
+      navigateToView('dashboard');
+    } else {
+      navigateToView('onboarding');
+    }
   };
 
   const handleLogout = async () => {
@@ -277,8 +276,8 @@ function MainAppContent() {
 
     // 4. If profile is loaded from database
     if (profileStatus === 'loaded') {
-      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+      // Use ONLY the explicit persisted flag \u2014 never field inference
+      const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
 
       if (isCompleted) {
         // Run/re-run eligibility matching against the latest scholarship catalog
@@ -346,12 +345,13 @@ function MainAppContent() {
   // Auth is resolved — render the application.
   const isProtected = ['dashboard', 'onboarding', 'analysis', 'results', 'admin'].includes(view);
   const requiresOnboarding = ['dashboard', 'results'].includes(view);
+  const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
 
   // Strictly sanitize view rendering so unauthenticated users never see unpermitted views.
-  // Only redirect to onboarding when confirmed not_found in DB.
+  // Incomplete users attempting to access dashboard / results must be kept in onboarding.
   const activeView = (!currentUser && isProtected)
     ? 'landing'
-    : (currentUser && requiresOnboarding && profileStatus === 'not_found')
+    : (currentUser && requiresOnboarding && (!isCompleted || profileStatus === 'not_found'))
       ? 'onboarding'
       : view;
 
@@ -389,7 +389,7 @@ function MainAppContent() {
           onCheckEligibilityClick={handleStartCheckEligibility}
           onNavClick={handleNavClick}
           onGoToDashboard={() => {
-            navigateToView(profileStatus === 'not_found' ? 'onboarding' : 'dashboard');
+            navigateToView(isCompleted ? 'dashboard' : 'onboarding');
           }}
           onLogout={handleLogout}
         />

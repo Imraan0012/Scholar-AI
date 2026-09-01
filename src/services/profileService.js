@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabaseClient.js';
  */
 export function mapSupabaseProfileToDTO(row) {
   if (!row) return null;
-  const isComplete = Boolean(row.onboarding_complete || (row.onboarding_step != null && row.onboarding_step >= 5));
+  // Completion is SOLELY determined by the explicit boolean flag onboarding_complete
+  const isComplete = Boolean(row.onboarding_complete === true);
 
   return {
     id: row.id,
@@ -85,11 +86,11 @@ export function mapSupabaseProfileToDTO(row) {
     competitiveExamRank: row.competitive_exam_rank,
 
     // Workflow State
-    onboardingStep: isComplete ? 5 : (row.onboarding_step != null ? row.onboarding_step : 1),
+    onboardingStep: isComplete ? 5 : (row.onboarding_step != null ? Number(row.onboarding_step) : 1),
     onboardingComplete: isComplete,
     isOnboarded: isComplete,
-    profileCompletionScore: row.profile_completion_score || (isComplete ? 100 : 50),
-    profileCompletion: row.profile_completion_score || (isComplete ? 100 : 50)
+    profileCompletionScore: row.profile_completion_score || (isComplete ? 100 : Math.min(90, Math.max(10, (row.onboarding_step || 1) * 20))),
+    profileCompletion: row.profile_completion_score || (isComplete ? 100 : Math.min(90, Math.max(10, (row.onboarding_step || 1) * 20)))
   };
 }
 
@@ -98,7 +99,8 @@ export function mapSupabaseProfileToDTO(row) {
  */
 export function mapDTOToSupabaseRow(userId, dto) {
   if (!userId || !dto) return null;
-  const isComplete = Boolean(dto.onboardingComplete || dto.isOnboarded || dto.onboardingStep >= 5);
+  // Completion is ONLY via explicit flag — NEVER inferred from step number.
+  const isComplete = Boolean(dto.onboardingComplete === true || dto.isOnboarded === true);
 
   const row = {
     user_id: userId,
@@ -118,14 +120,14 @@ export function mapDTOToSupabaseRow(userId, dto) {
     institution_name: dto.institutionName || dto.universityName || 'Institution',
     institution_type: dto.institutionType || 'Government',
     study_mode: dto.studyMode || 'FULL_TIME',
-    class_10_percentage: dto.class10Percentage != null ? parseFloat(dto.class10Percentage) : null,
-    class_12_percentage: dto.class12Percentage != null ? parseFloat(dto.class12Percentage) : null,
-    undergraduate_cgpa: dto.undergraduateCgpa != null ? parseFloat(dto.undergraduateCgpa) : null,
-    postgraduate_cgpa: dto.postgraduateCgpa != null ? parseFloat(dto.postgraduateCgpa) : null,
-    current_cgpa: dto.currentCgpa != null ? parseFloat(dto.currentCgpa) : (dto.cgpa != null ? parseFloat(dto.cgpa) : null),
+    class_10_percentage: dto.class10Percentage != null && dto.class10Percentage !== '' ? parseFloat(dto.class10Percentage) : null,
+    class_12_percentage: dto.class12Percentage != null && dto.class12Percentage !== '' ? parseFloat(dto.class12Percentage) : null,
+    undergraduate_cgpa: dto.undergraduateCgpa != null && dto.undergraduateCgpa !== '' ? parseFloat(dto.undergraduateCgpa) : null,
+    postgraduate_cgpa: dto.postgraduateCgpa != null && dto.postgraduateCgpa !== '' ? parseFloat(dto.postgraduateCgpa) : null,
+    current_cgpa: dto.currentCgpa != null && dto.currentCgpa !== '' ? parseFloat(dto.currentCgpa) : (dto.cgpa != null && dto.cgpa !== '' ? parseFloat(dto.cgpa) : null),
 
     // Financial
-    annual_family_income: dto.annualFamilyIncome != null ? parseFloat(dto.annualFamilyIncome) : (dto.annualIncome != null ? parseFloat(dto.annualIncome) : 0),
+    annual_family_income: (dto.annualFamilyIncome != null && dto.annualFamilyIncome !== '') ? parseFloat(dto.annualFamilyIncome) : ((dto.annualIncome != null && dto.annualIncome !== '') ? parseFloat(dto.annualIncome) : 0),
     income_source: dto.incomeSource || 'SALARY',
     father_occupation: dto.fatherOccupation || null,
     mother_occupation: dto.motherOccupation || null,
@@ -144,7 +146,7 @@ export function mapDTOToSupabaseRow(userId, dto) {
 
     // Additional
     has_disability: Boolean(dto.hasDisability || dto.isPwd),
-    disability_percentage: dto.disabilityPercentage != null ? parseFloat(dto.disabilityPercentage) : 0,
+    disability_percentage: dto.disabilityPercentage != null && dto.disabilityPercentage !== '' ? parseFloat(dto.disabilityPercentage) : 0,
     has_udid_card: Boolean(dto.hasUdidCard),
     is_farmer_family: Boolean(dto.isFarmerFamily || dto.farmerFamily),
     is_first_graduate: Boolean(dto.isFirstGraduate || dto.isFirstGenLearner),
@@ -157,13 +159,13 @@ export function mapDTOToSupabaseRow(userId, dto) {
     existing_scholarship: dto.existingScholarship || null,
     application_type: dto.applicationType || 'FRESH',
     competitive_exam_name: dto.competitiveExamName || null,
-    competitive_exam_score: dto.competitiveExamScore != null ? parseFloat(dto.competitiveExamScore) : null,
-    competitive_exam_rank: dto.competitiveExamRank != null ? parseInt(dto.competitiveExamRank, 10) : null,
+    competitive_exam_score: dto.competitiveExamScore != null && dto.competitiveExamScore !== '' ? parseFloat(dto.competitiveExamScore) : null,
+    competitive_exam_rank: dto.competitiveExamRank != null && dto.competitiveExamRank !== '' ? parseInt(dto.competitiveExamRank, 10) : null,
 
-    // Workflow State
-    onboarding_step: isComplete ? 5 : (dto.onboardingStep != null ? parseInt(dto.onboardingStep, 10) : 1),
+    // Workflow State — step is stored as-is (1..5); completion only via explicit flag
+    onboarding_step: dto.onboardingStep != null ? parseInt(dto.onboardingStep, 10) : 1,
     onboarding_complete: isComplete,
-    profile_completion_score: isComplete ? 100 : (dto.profileCompletionScore || 50),
+    profile_completion_score: isComplete ? 100 : (dto.profileCompletionScore || Math.min(90, Math.max(10, (dto.onboardingStep || 1) * 20))),
     updated_at: new Date().toISOString()
   };
 
@@ -201,14 +203,14 @@ export const profileService = {
           .maybeSingle();
 
         if (sbRow) {
-          const isComplete = Boolean(sbRow.onboarding_complete || (sbRow.onboarding_step && sbRow.onboarding_step >= 5));
+          const isComplete = Boolean(sbRow.onboarding_complete === true);
           return {
             authenticated: true,
             userId,
             profileExists: true,
             onboardingComplete: isComplete,
             onboardingStep: isComplete ? 5 : (sbRow.onboarding_step || 1),
-            profileCompletionScore: sbRow.profile_completion_score || (isComplete ? 100 : 50)
+            profileCompletionScore: sbRow.profile_completion_score || (isComplete ? 100 : Math.min(90, Math.max(10, (sbRow.onboarding_step || 1) * 20)))
           };
         }
         return {
@@ -327,7 +329,9 @@ export const profileService = {
    */
   async saveOnboardingStep(stepNumber, stepData, userId = null) {
     this.saveOnboardingProgress(stepNumber, stepData);
-    const isCompleted = stepNumber >= 5;
+    // Completion flag must be EXPLICITLY set in stepData — never inferred from step number.
+    // Only the caller (OnboardingWizard Step 5 path) sets onboardingComplete: true.
+    const isCompleted = stepData.onboardingComplete === true || stepData.isOnboarded === true;
     const payload = {
       ...stepData,
       onboardingStep: stepNumber,
@@ -368,11 +372,12 @@ export const profileService = {
   },
 
   /**
-   * Saves onboarding step locally for instantaneous retrieval.
+   * Saves onboarding step locally for instantaneous retrieval, scoped to user.
    */
-  saveOnboardingProgress(stepNumber, stepData) {
+  saveOnboardingProgress(stepNumber, stepData, userId = null) {
     try {
-      localStorage.setItem('scholar_ai_onboarding_step', String(stepNumber));
+      const key = userId ? `scholar_ai_onboarding_step_${userId}` : 'scholar_ai_onboarding_step';
+      localStorage.setItem(key, String(stepNumber));
     } catch (e) { }
   },
 
@@ -382,26 +387,19 @@ export const profileService = {
    */
   getFirstIncompleteStep(p) {
     if (!p) return 1;
-    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true || p.onboardingStep >= 5) {
-      return 6;
+
+    // ── COMPLETION GATE: only the explicit persisted flag counts ──────────────
+    // A profile row existing with filled fields does NOT mean completed.
+    // Completion requires the explicit onboardingComplete flag.
+    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true) {
+      return 6; // fully complete
     }
 
-    // If core profile fields are already filled, treat profile as completed
-    const hasCore = Boolean(
-      (p.fullName || p.name) &&
-      (p.course || p.educationLevel) &&
-      (p.annualIncome || p.annualFamilyIncome != null) &&
-      (p.domicileState || p.state)
-    );
-    if (hasCore) {
-      return 6;
-    }
-
-    // Helper: treat null/undefined/empty-string/0 as missing
+    // Helper: treat null/undefined/empty-string as missing
     const has = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '0';
     const hasNum = (v) => v !== undefined && v !== null && v !== '' && !isNaN(Number(v)) && Number(v) > 0;
 
-    // --- STEP 1: Personal Details ---
+    // ── STEP 1: Personal Details ──────────────────────────────────────────────
     const hasName = Boolean(p.fullName && String(p.fullName).trim());
     const hasDob = has(p.dob) || has(p.dateOfBirth);
     const hasGender = has(p.gender) && p.gender !== 'ANY';
@@ -410,48 +408,40 @@ export const profileService = {
       return 1;
     }
 
-    // --- STEP 2: Academic Background ---
+    // ── STEP 2: Academic Background ───────────────────────────────────────────
     const edu = p.educationLevel || '';
     if (!edu) return 2;
 
     if (edu === 'TWELFTH_COMPLETED') {
-      const has10 = hasNum(p.class10Percentage);
-      const has12 = hasNum(p.class12Percentage);
-      if (!has10 || !has12) return 2;
+      if (!hasNum(p.class10Percentage) || !hasNum(p.class12Percentage)) return 2;
     } else if (edu === 'DIPLOMA') {
       const hasCourse = Boolean((p.course && p.course.trim()) || (p.diplomaCourse && p.diplomaCourse.trim()));
       if (!hasCourse) return 2;
-    } else if (edu === 'UNDERGRADUATE') {
-      const hasCourse = Boolean(p.course && p.course.trim());
-      if (!hasCourse) return 2;
-    } else if (edu === 'POSTGRADUATE') {
-      const hasCourse = Boolean(p.course && p.course.trim());
-      if (!hasCourse) return 2;
+    } else if (edu === 'UNDERGRADUATE' || edu === 'POSTGRADUATE') {
+      if (!Boolean(p.course && p.course.trim())) return 2;
     }
 
-    // --- STEP 3: Financial Information ---
-    const incomeVal = p.annualIncome !== undefined ? p.annualIncome : p.annualFamilyIncome;
-    const hasIncome = hasNum(incomeVal);
-    if (!hasIncome) {
-      return 3;
-    }
+    // ── STEP 3: Financial Information ─────────────────────────────────────────
+    const incomeVal = p.annualIncome !== undefined && p.annualIncome !== '' ? p.annualIncome : p.annualFamilyIncome;
+    if (!hasNum(incomeVal)) return 3;
 
-    // --- STEP 4: Category & Domicile ---
-    const hasCategory = has(p.category);
+    // ── STEP 4: Category & State of Residence ────────────────────────────────
+    const hasCategory = has(p.category) && p.category !== '';
     const hasDomicile = has(p.domicileState) || has(p.state) || has(p.currentResidenceState);
-    if (!hasCategory || !hasDomicile) {
-      return 4;
-    }
+    if (!hasCategory || !hasDomicile) return 4;
 
-    return 6;
+    // ── STEP 5: Additional Information ───────────────────────────────────────
+    // Step 5 completion is ONLY confirmed by the explicit onboardingComplete flag.
+    return 5;
   },
 
   /**
-   * Retrieves saved onboarding step from localStorage.
+   * Retrieves saved onboarding step from localStorage for user.
    */
-  getSavedOnboardingProgress() {
+  getSavedOnboardingProgress(userId = null) {
     try {
-      const step = localStorage.getItem('scholar_ai_onboarding_step');
+      const key = userId ? `scholar_ai_onboarding_step_${userId}` : 'scholar_ai_onboarding_step';
+      const step = localStorage.getItem(key);
       return step ? parseInt(step, 10) : 1;
     } catch (e) {
       return 1;

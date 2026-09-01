@@ -6,8 +6,7 @@ import { profileService } from '../../services/profileService';
 
 export default function FinalCTASection({ onCheckEligibilityClick }) {
   const { currentUser, profile } = useStudentProfile();
-  const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-  const isProfileComplete = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+  const isProfileComplete = Boolean(profile?.onboardingComplete === true || profile?.isOnboarded === true);
 
   const titleText = !currentUser
     ? 'Find scholarships that match you.'

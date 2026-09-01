@@ -1,37 +1,33 @@
-﻿import pg from 'pg';
+import 'dotenv/config';
+import pg from 'pg';
 const { Client } = pg;
 
 const client = new Client({
-  connectionString: 'process.env.SUPABASE_DB_URL',
+  user: 'postgres',
+  host: 'db.gixgyrsyopwtfgxvfglp.supabase.co',
+  database: 'postgres',
+  password: process.env.SUPABASE_DB_PASSWORD,
+  port: 5432,
   ssl: { rejectUnauthorized: false }
 });
 
 async function main() {
   await client.connect();
-
-  console.log('--- 1. STUDENT_PROFILES COLUMNS ---');
-  const cols = await client.query(`
-    SELECT column_name, data_type, column_default, is_nullable
+  const res = await client.query(`
+    SELECT column_name, data_type, is_nullable, column_default
     FROM information_schema.columns
-    WHERE table_name = 'student_profiles'
+    WHERE table_schema = 'public' AND table_name = 'student_profiles'
     ORDER BY ordinal_position;
   `);
-  console.log(cols.rows);
+  console.log('student_profiles columns:');
+  console.table(res.rows);
 
-  console.log('--- 2. RPC register_student_account ---');
   const rpc = await client.query(`
     SELECT pg_get_functiondef(oid)
     FROM pg_proc
     WHERE proname = 'register_student_account';
   `);
-  console.log(rpc.rows[0]?.pg_get_functiondef);
-
-  console.log('--- 3. ALL ROWS IN STUDENT_PROFILES ---');
-  const rows = await client.query(`
-    SELECT id, user_id, email, full_name, onboarding_complete, onboarding_step, domicile_state, course, institution_name
-    FROM student_profiles;
-  `);
-  console.log(rows.rows);
+  console.log('RPC register_student_account definition:\n', rpc.rows[0]?.pg_get_functiondef);
 
   await client.end();
 }

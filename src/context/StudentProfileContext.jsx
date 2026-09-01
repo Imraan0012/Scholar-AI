@@ -197,10 +197,12 @@ export const StudentProfileProvider = ({ children }) => {
 
       if (userProfile && (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course || userProfile.onboardingComplete || userProfile.annualFamilyIncome != null)) {
         const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
-        // If current in-memory session was already completed, do NOT downgrade to incomplete
-        const prevCompleted = Boolean(profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded);
-        const isCompleted = prevCompleted || Boolean(userProfile.onboardingComplete || userProfile.isOnboarded || userProfile.onboarding_complete || userProfile.onboardingStep >= 5) || firstIncomplete === 6;
-        const step = isCompleted ? 5 : Math.min(5, Math.max(1, firstIncomplete));
+        // Completion is determined SOLELY by explicit persisted completion flag
+        const isCompleted = Boolean(userProfile.onboardingComplete === true || userProfile.isOnboarded === true || userProfile.onboarding_complete === true);
+        const persistedStep = userProfile.onboardingStep || userProfile.onboarding_step;
+        const step = isCompleted ? 5 : (persistedStep ? Math.min(5, Math.max(1, Number(persistedStep))) : Math.min(5, Math.max(1, firstIncomplete)));
+
+        console.log(`[PROFILE] profileExists=true onboardingCompleted=${isCompleted} onboardingStep=${step}`);
 
         const cleanProfile = {
           ...empty,
@@ -216,9 +218,10 @@ export const StudentProfileProvider = ({ children }) => {
 
         writeProfileHint(true, isCompleted);
         try {
-          localStorage.setItem('scholar_ai_onboarding_step', String(step));
+          profileService.saveOnboardingProgress(step, cleanProfile, user.id);
         } catch (e) { }
       } else {
+        console.log('[PROFILE] profileExists=false onboardingCompleted=false onboardingStep=1');
         // If we already have a loaded, completed profile in memory, do NOT downgrade to not_found on empty background sync
         if (profileRef.current?.id && (profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded)) {
           console.log('[StudentProfileContext] Retaining existing in-memory completed profile despite empty background response');
@@ -410,7 +413,7 @@ export const StudentProfileProvider = ({ children }) => {
     setProfileStatus('loaded');
     setProfile(prev => {
       const merged = { ...prev, ...updates };
-      if (updates.onboardingComplete || updates.isOnboarded || updates.onboardingStep >= 5) {
+      if (updates.onboardingComplete === true || updates.isOnboarded === true) {
         merged.onboardingComplete = true;
         merged.isOnboarded = true;
         merged.onboardingStep = 5;
@@ -565,6 +568,8 @@ export const StudentProfileProvider = ({ children }) => {
       value={{
         currentUser,
         profile,
+        onboardingCompleted: Boolean(profile?.onboardingComplete === true || profile?.isOnboarded === true),
+        onboardingStep: profile?.onboardingStep || 1,
         scholarships,
         bookmarks,
         savedApplications,

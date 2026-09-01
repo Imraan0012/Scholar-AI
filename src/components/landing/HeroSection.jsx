@@ -19,9 +19,8 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
   const { profile, scholarships, profileStatus, profileLoading, authLoading } = useStudentProfile();
   const liveCatalogCount = (scholarships && scholarships.length > 0) ? scholarships.length : 63;
 
-  // Centralized profile completion check
-  const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-  const isProfileComplete = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+  // Centralized profile completion check — strictly authoritative flag only
+  const isProfileComplete = Boolean(profile?.onboardingComplete === true || profile?.isOnboarded === true);
 
   // Profile-aware CTA state
   let ctaText = 'Check My Eligibility';

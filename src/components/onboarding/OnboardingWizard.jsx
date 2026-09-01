@@ -92,57 +92,57 @@ function formatIncomeInWords(amount) {
 }
 
 export default function OnboardingWizard({ onComplete, onCancel }) {
-  const { profile, updateProfile, profileStatus } = useStudentProfile();
+  const { profile, updateProfile, profileStatus, currentUser } = useStudentProfile();
 
   const [currentStep, setCurrentStep] = useState(() => {
+    if (profile?.onboardingComplete === true || profile?.isOnboarded === true) return 5;
     const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+    const persistedStep = profile?.onboardingStep || profileService.getSavedOnboardingProgress(currentUser?.id);
+    if (persistedStep && persistedStep >= 1 && persistedStep <= 5) {
+      return Math.min(Number(persistedStep), firstIncomplete);
+    }
     return (firstIncomplete >= 1 && firstIncomplete <= 5) ? firstIncomplete : 1;
   });
 
-  // Guard: If an already-completed user enters OnboardingWizard, automatically redirect them to analysis/dashboard
-  useEffect(() => {
-    if (profileStatus === 'loaded') {
-      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
-      if (isCompleted) {
-        console.log('[OnboardingWizard] User profile is already complete -> redirecting to analysis');
-        onComplete?.(profile);
-      }
-    }
-  }, [profile, profileStatus, onComplete]);
-
   const [formData, setFormData] = useState(() => ({
     ...profile,
-    gender: profile.gender || 'MALE',
-    nationality: profile.nationality || 'INDIAN',
-    educationLevel: profile.educationLevel || 'UNDERGRADUATE',
-    studyMode: profile.studyMode || 'FULL_TIME',
-    applicationType: profile.applicationType || 'FRESH',
-    institutionType: profile.institutionType || 'Government',
-    category: profile.category || 'GENERAL',
-    incomeSource: profile.incomeSource || 'SALARY',
-    familyMembersCount: profile.familyMembersCount || 4,
-    earningMembersCount: profile.earningMembersCount || 1,
-    incomeCertificateStatus: profile.incomeCertificateStatus || (profile.hasIncomeCertificate ? 'YES' : 'NO'),
-    incomeCertIssuedBy: profile.incomeCertIssuedBy || 'Tehsildar',
-    obcNclStatus: profile.obcNclStatus || 'YES',
-    obcCertStatus: profile.obcCertStatus || 'YES',
-    ewsCertStatus: profile.ewsCertStatus || 'NO',
-    categoryCertStatus: profile.categoryCertStatus || 'YES',
-    domicileCertStatus: profile.domicileCertStatus || 'AVAILABLE',
-    documentStatuses: profile.documentStatuses || {},
-    uploadedFiles: profile.uploadedFiles || {}
+    gender: profile?.gender || 'MALE',
+    nationality: profile?.nationality || 'INDIAN',
+    educationLevel: profile?.educationLevel || 'UNDERGRADUATE',
+    studyMode: profile?.studyMode || 'FULL_TIME',
+    applicationType: profile?.applicationType || 'FRESH',
+    institutionType: profile?.institutionType || 'Government',
+    category: profile?.category || 'GENERAL',
+    incomeSource: profile?.incomeSource || 'SALARY',
+    familyMembersCount: profile?.familyMembersCount || 4,
+    earningMembersCount: profile?.earningMembersCount || 1,
+    incomeCertificateStatus: profile?.incomeCertificateStatus || (profile?.hasIncomeCertificate ? 'YES' : 'NO'),
+    incomeCertIssuedBy: profile?.incomeCertIssuedBy || 'Tehsildar',
+    obcNclStatus: profile?.obcNclStatus || 'YES',
+    obcCertStatus: profile?.obcCertStatus || 'YES',
+    ewsCertStatus: profile?.ewsCertStatus || 'NO',
+    categoryCertStatus: profile?.categoryCertStatus || 'YES',
+    domicileCertStatus: profile?.domicileCertStatus || 'AVAILABLE',
+    documentStatuses: profile?.documentStatuses || {},
+    uploadedFiles: profile?.uploadedFiles || {}
   }));
   const [fieldErrors, setFieldErrors] = useState({});
   const [saveError, setSaveError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Synchronize server-loaded profile fields into form state on initial load
+  const hasSyncedInitialProfile = React.useRef(false);
   useEffect(() => {
-    if (profile && profileStatus === 'loaded') {
-      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-      if (firstIncomplete >= 1 && firstIncomplete <= 5) {
-        setCurrentStep(firstIncomplete);
+    if (profile && profileStatus === 'loaded' && !hasSyncedInitialProfile.current) {
+      hasSyncedInitialProfile.current = true;
+      const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
+      if (!isCompleted) {
+        const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+        const persistedStep = profile?.onboardingStep || profileService.getSavedOnboardingProgress(currentUser?.id);
+        const resolvedStep = (persistedStep && persistedStep >= 1 && persistedStep <= 5)
+          ? Math.min(Number(persistedStep), firstIncomplete)
+          : ((firstIncomplete >= 1 && firstIncomplete <= 5) ? firstIncomplete : 1);
+        setCurrentStep(resolvedStep);
       }
       setFormData((prev) => {
         const next = { ...prev };
@@ -154,7 +154,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
         return next;
       });
     }
-  }, [profile, profileStatus]);
+  }, [profile, profileStatus, currentUser?.id]);
 
   const handleChange = (field, value) => {
     setSaveError(null);
@@ -505,6 +505,10 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
   const handleContinue = async () => {
     setSaveError(null);
 
+    // Sanitize safe non-sensitive defaults that come from Supabase enum types.
+    // CRITICAL: Do NOT inject fake values for fields that belong to later steps
+    // (category, domicileState, applicationType). If the user hasn't filled those
+    // yet, they must remain empty so validation correctly gates them.
     const sanitizedData = {
       ...formData,
       gender: formData.gender || 'MALE',
@@ -520,10 +524,9 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
       incomeSource: formData.incomeSource || 'SALARY',
       familyMembersCount: formData.familyMembersCount || 4,
       earningMembersCount: formData.earningMembersCount !== undefined ? formData.earningMembersCount : 1,
-      incomeCertificateStatus: formData.incomeCertificateStatus || 'YES',
-      category: formData.category || 'GENERAL',
-      domicileState: formData.domicileState || 'Tamil Nadu',
-      applicationType: formData.applicationType || 'FRESH'
+      incomeCertificateStatus: formData.incomeCertificateStatus || 'YES'
+      // NOTE: category, domicileState, applicationType are intentionally NOT defaulted here.
+      // They belong to Steps 4 and 5 and must be explicitly chosen by the user.
     };
 
     setFormData(sanitizedData);
@@ -534,34 +537,58 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
 
     if (currentStep < 5) {
       const nextStep = currentStep + 1;
-      // 1. Instant optimistic state transition
-      updateProfile(sanitizedData);
-      setCurrentStep(nextStep);
-      setFieldErrors({});
-      window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // 2. Non-blocking asynchronous database sync in background
-      profileService.saveOnboardingStep(nextStep, sanitizedData).catch((err) => {
-        console.warn('[OnboardingWizard] Background step save notice:', err.message);
-      });
+      // 1. Show saving state while we persist to Supabase
+      setIsSaving(true);
+      try {
+        console.log(`[ONBOARDING]\nstep=${currentStep}\naction=save_start`);
+        // Blocking save: do NOT advance the step until the database confirms.
+        // onboardingComplete must remain false for intermediate steps.
+        const stepPayload = {
+          ...sanitizedData,
+          onboardingStep: nextStep,
+          onboardingComplete: false,
+          isOnboarded: false
+        };
+        await profileService.saveOnboardingStep(nextStep, stepPayload, currentUser?.id);
+        console.log(`[ONBOARDING]\nstep=${currentStep}\naction=save_success\nrequestedNextStep=${nextStep}`);
+
+        // Update central profile state with persisted values
+        updateProfile(stepPayload);
+        setCurrentStep(nextStep);
+        setFieldErrors({});
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        // Persist failed — stay on current step, show error, allow retry
+        console.error('[OnboardingWizard] Step save failed:', err.message);
+        setSaveError('Could not save your progress. Please check your connection and try again.');
+      } finally {
+        setIsSaving(false);
+      }
+
     } else if (currentStep === 5) {
-      const completedData = {
-        ...sanitizedData,
-        isOnboarded: true,
-        onboardingComplete: true,
-        onboardingStep: 5
-      };
+      // Step 5: must persist BEFORE marking complete and navigating away
+      setIsSaving(true);
+      try {
+        const completedData = {
+          ...sanitizedData,
+          isOnboarded: true,
+          onboardingComplete: true,
+          onboardingStep: 5
+        };
 
-      // 1. Optimistically update local profile state immediately
-      updateProfile(completedData);
+        // Blocking save — if this fails, the user stays on Step 5 with a retry
+        await profileService.saveOnboardingStep(5, completedData);
 
-      // 2. Immediately open the existing scholarship eligibility analysis animation
-      onComplete?.(completedData);
-
-      // 3. Save completed profile to Supabase & Spring Boot backend in background
-      profileService.saveOnboardingStep(5, completedData).catch((err) => {
-        console.warn('[OnboardingWizard] Profile background save notice:', err.message);
-      });
+        // Only after successful persistence: update context and navigate
+        updateProfile(completedData);
+        onComplete?.(completedData);
+      } catch (err) {
+        console.error('[OnboardingWizard] Final step save failed:', err.message);
+        setSaveError('Could not complete your profile. Please check your connection and try again.');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -1885,14 +1912,20 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                           Select your primary state of residence.
                         </span>
                         <select
-                          value={formData.domicileState || 'Maharashtra'}
+                          value={formData.domicileState || ''}
                           onChange={(e) => handleChange('domicileState', e.target.value)}
-                          className="w-full h-[46px] px-4 text-[14px] bg-white border border-[#CBD5E1] rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors"
+                          className={`w-full h-[46px] px-4 text-[14px] bg-white border rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors ${fieldErrors.domicileState ? 'border-red-400 bg-red-50/10' : 'border-[#CBD5E1]'}`}
                         >
+                          <option value="" disabled>Select State / Union Territory...</option>
                           {INDIAN_STATES_AND_UTS.map((st) => (
                             <option key={st} value={st}>{st}</option>
                           ))}
                         </select>
+                        {fieldErrors.domicileState && (
+                          <p className="text-[12px] text-red-600 font-medium mt-1">
+                            {fieldErrors.domicileState}
+                          </p>
+                        )}
                       </div>
 
                       {/* Domicile Certificate & PIN code */}
@@ -2429,7 +2462,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                   disabled={isSaving}
                   className="min-w-[124px] h-[46px] px-5 rounded-[10px] bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-[14px] font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer hover:shadow"
                 >
-                  <span>{isSaving ? 'Saving...' : (currentStep === 5 ? 'Find Scholarships →' : 'Continue →')}</span>
+                  <span>{isSaving ? 'Saving...' : (currentStep === 5 ? 'Save & Check Eligibility →' : 'Continue →')}</span>
                 </button>
               </div>
 
