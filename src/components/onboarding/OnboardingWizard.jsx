@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudentProfile } from '../../context/StudentProfileContext';
 import { profileService } from '../../services/profileService';
@@ -99,17 +99,17 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
     return (firstIncomplete >= 1 && firstIncomplete <= 5) ? firstIncomplete : 1;
   });
 
-  // Guard: If an already-completed user enters OnboardingWizard, automatically redirect them to analysis/dashboard
+  // Initial mount guard ONLY: If an already-completed user enters OnboardingWizard directly, redirect to analysis
+  const hasCheckedInitial = useRef(false);
   useEffect(() => {
-    if (profileStatus === 'loaded') {
-      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
-      if (isCompleted) {
-        console.log('[OnboardingWizard] User profile is already complete -> redirecting to analysis');
+    if (!hasCheckedInitial.current && profileStatus === 'loaded') {
+      hasCheckedInitial.current = true;
+      if (profile?.onboardingComplete === true || profile?.isOnboarded === true) {
+        console.log('[OnboardingWizard] User profile was already complete -> redirecting to analysis');
         onComplete?.(profile);
       }
     }
-  }, [profile, profileStatus, onComplete]);
+  }, [profile?.onboardingComplete, profile?.isOnboarded, profileStatus, onComplete]);
 
   const [formData, setFormData] = useState(() => ({
     ...profile,
@@ -505,52 +505,56 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
   const handleContinue = async () => {
     setSaveError(null);
 
-    const sanitizedData = {
-      ...formData,
-      gender: formData.gender || 'MALE',
-      nationality: formData.nationality || 'INDIAN',
-      educationLevel: formData.educationLevel || 'UNDERGRADUATE',
-      institutionType: formData.institutionType || 'Government',
-      currentYear: formData.currentYear || 1,
-      admissionYear: formData.admissionYear || 2024,
-      studyMode: formData.studyMode || 'Full-time',
-      class12Stream: formData.class12Stream || 'Science',
-      class12PassingYear: formData.class12PassingYear || 2024,
-      intendedAdmissionYear: formData.intendedAdmissionYear || 2026,
-      incomeSource: formData.incomeSource || 'SALARY',
-      familyMembersCount: formData.familyMembersCount || 4,
-      earningMembersCount: formData.earningMembersCount !== undefined ? formData.earningMembersCount : 1,
-      incomeCertificateStatus: formData.incomeCertificateStatus || 'YES',
-      category: formData.category || 'GENERAL',
-      domicileState: formData.domicileState || 'Tamil Nadu',
-      applicationType: formData.applicationType || 'FRESH'
-    };
-
-    setFormData(sanitizedData);
-
+    // Validate current step fields
     if (currentStep <= 5) {
-      if (!validateStep(currentStep, sanitizedData)) return;
+      if (!validateStep(currentStep, formData)) return;
     }
 
     if (currentStep < 5) {
       const nextStep = currentStep + 1;
-      // 1. Instant optimistic state transition
-      updateProfile(sanitizedData);
+
+      // 1. Advance step in form state
       setCurrentStep(nextStep);
       setFieldErrors({});
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // 2. Non-blocking asynchronous database sync in background
-      profileService.saveOnboardingStep(nextStep, sanitizedData).catch((err) => {
+      // 2. Persist draft progress with onboardingComplete explicitly FALSE
+      const draftData = {
+        ...formData,
+        onboardingStep: nextStep,
+        onboardingComplete: false,
+        isOnboarded: false
+      };
+      updateProfile(draftData);
+      profileService.saveOnboardingStep(nextStep, draftData).catch((err) => {
         console.warn('[OnboardingWizard] Background step save notice:', err.message);
       });
     } else if (currentStep === 5) {
       const completedData = {
-        ...sanitizedData,
+        ...formData,
+        gender: formData.gender || 'MALE',
+        nationality: formData.nationality || 'INDIAN',
+        educationLevel: formData.educationLevel || 'UNDERGRADUATE',
+        institutionType: formData.institutionType || 'Government',
+        currentYear: formData.currentYear || 1,
+        admissionYear: formData.admissionYear || 2024,
+        studyMode: formData.studyMode || 'Full-time',
+        class12Stream: formData.class12Stream || 'Science',
+        class12PassingYear: formData.class12PassingYear || 2024,
+        intendedAdmissionYear: formData.intendedAdmissionYear || 2026,
+        incomeSource: formData.incomeSource || 'SALARY',
+        familyMembersCount: formData.familyMembersCount || 4,
+        earningMembersCount: formData.earningMembersCount !== undefined ? formData.earningMembersCount : 1,
+        incomeCertificateStatus: formData.incomeCertificateStatus || 'YES',
+        category: formData.category || 'GENERAL',
+        domicileState: formData.domicileState || 'Tamil Nadu',
+        applicationType: formData.applicationType || 'FRESH',
         isOnboarded: true,
         onboardingComplete: true,
         onboardingStep: 5
       };
+
+      setFormData(completedData);
 
       // 1. Optimistically update local profile state immediately
       updateProfile(completedData);

@@ -173,10 +173,10 @@ function MainAppContent() {
       }
 
       const firstIncomplete = profileService.getFirstIncompleteStep(profile);
-      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded || profile?.onboardingStep >= 5) || firstIncomplete === 6;
+      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
 
-      // Guard /onboarding: If user has a completed profile, redirect them away to /dashboard
-      if (view === 'onboarding' && isCompleted) {
+      // Guard /onboarding: If user has already explicitly completed onboarding, redirect them away to /dashboard
+      if (view === 'onboarding' && (profile?.onboardingComplete === true || profile?.isOnboarded === true)) {
         console.log('[RouteGuard] authState=authenticated profileStatus=loaded onboardingComplete=true view=onboarding decision=REDIRECT_DASHBOARD_FROM_ONBOARDING');
         setView('dashboard');
         if (window.location.pathname !== '/dashboard') {

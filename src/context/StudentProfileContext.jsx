@@ -410,7 +410,7 @@ export const StudentProfileProvider = ({ children }) => {
     setProfileStatus('loaded');
     setProfile(prev => {
       const merged = { ...prev, ...updates };
-      if (updates.onboardingComplete || updates.isOnboarded || updates.onboardingStep >= 5) {
+      if (updates.onboardingComplete === true || updates.isOnboarded === true) {
         merged.onboardingComplete = true;
         merged.isOnboarded = true;
         merged.onboardingStep = 5;
