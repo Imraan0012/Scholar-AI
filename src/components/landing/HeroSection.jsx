@@ -98,10 +98,15 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
           <span className="text-gray-300 font-medium">Official sources • Central & state scholarships</span>
         </motion.div>
 
-        {/* Main Headline */}
+        {/* Main Headline (Dominant visual anchor) */}
         <motion.h1
           variants={itemVariants}
-          className="text-2xl sm:text-3xl md:text-4xl lg:text-[44px] font-extrabold text-center tracking-tight text-white max-w-3xl leading-[1.15]"
+          style={{
+            fontSize: 'clamp(2.4rem, 4.8vw, 4.25rem)',
+            lineHeight: 1.02,
+            letterSpacing: '-0.03em'
+          }}
+          className="font-extrabold text-center text-white max-w-3xl leading-[1.02]"
         >
           Find scholarships you're <br className="hidden sm:inline" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-cyan-200 to-indigo-300">

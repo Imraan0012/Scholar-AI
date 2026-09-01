@@ -3,7 +3,7 @@ import { cva } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 const metricCardVariants = cva(
-  'relative flex flex-col justify-center items-center text-center p-4 sm:p-5 rounded-2xl border transition-all duration-300 backdrop-blur-xl group select-none h-full',
+  'relative flex flex-col justify-center items-center text-center p-5 sm:p-6 rounded-2xl border transition-all duration-300 backdrop-blur-xl group select-none h-full',
   {
     variants: {
       theme: {
@@ -13,9 +13,9 @@ const metricCardVariants = cva(
         cyan: 'bg-cyan-950/20 border-cyan-500/20 text-white hover:border-cyan-500/40',
       },
       size: {
-        default: 'min-h-[135px] sm:min-h-[145px]',
-        compact: 'min-h-[100px] sm:min-h-[110px] p-3 sm:p-4',
-        large: 'min-h-[150px] sm:min-h-[160px] p-5 sm:p-6',
+        default: 'min-h-[170px] sm:min-h-[185px]',
+        compact: 'min-h-[130px] sm:min-h-[140px] p-4 sm:p-5',
+        large: 'min-h-[190px] sm:min-h-[205px] p-6 sm:p-7',
       }
     },
     defaultVariants: {
@@ -44,32 +44,39 @@ export default function MetricCard({
         </div>
       )}
 
-      {/* 1. Primary Value / Metric (Single Line, Balanced Scale) */}
-      <div className="w-full flex items-center justify-center">
-        <div className={cn(
-          "text-2xl sm:text-[28px] md:text-[32px] font-bold tracking-tight leading-none whitespace-nowrap inline-flex items-baseline justify-center gap-1",
-          accentColor
-        )}>
+      {/* LEVEL 1 — VALUE (Shared strict typography & fixed baseline height) */}
+      <div className="w-full h-[44px] flex items-center justify-center">
+        <span
+          className={cn(
+            "text-[32px] sm:text-[36px] md:text-[38px] font-bold tracking-tight leading-none whitespace-nowrap inline-flex items-baseline justify-center gap-1",
+            accentColor
+          )}
+          style={{ letterSpacing: '-0.02em' }}
+        >
           {value || children}
-        </div>
+        </span>
       </div>
 
-      {/* 2. Label */}
+      {/* LEVEL 2 — LABEL (15-16px semibold/bold near-white) */}
       {label && (
-        <span className={cn(
-          "text-sm font-semibold tracking-tight mt-2 block leading-snug whitespace-nowrap",
-          theme === 'light' ? 'text-slate-800' : 'text-gray-200'
-        )}>
+        <span
+          className={cn(
+            "text-[15px] sm:text-[16px] font-semibold tracking-tight mt-2.5 block leading-snug whitespace-nowrap",
+            theme === 'light' ? 'text-slate-800' : 'text-gray-100'
+          )}
+        >
           {label}
         </span>
       )}
 
-      {/* 3. Description */}
+      {/* LEVEL 3 — DESCRIPTION (13.5-14px regular muted) */}
       {subtitle && (
-        <span className={cn(
-          "text-xs sm:text-[13px] font-normal leading-normal mt-1 block",
-          theme === 'light' ? 'text-slate-500' : 'text-gray-400'
-        )}>
+        <span
+          className={cn(
+            "text-[13px] sm:text-[14px] font-normal leading-normal mt-1.5 block",
+            theme === 'light' ? 'text-slate-500' : 'text-gray-400'
+          )}
+        >
           {subtitle}
         </span>
       )}
