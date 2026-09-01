@@ -738,9 +738,13 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     </div>
                   </div>
                   <div>
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
-                      {stats.eligible}
-                    </span>
+                    {(!evaluationResults || evalLoading) ? (
+                      <div className="h-8 w-16 bg-slate-100 animate-pulse rounded-lg mt-1" />
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
+                        {stats.eligible}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships you qualify for
                     </span>
@@ -763,9 +767,13 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     </div>
                   </div>
                   <div>
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
-                      {stats.possible}
-                    </span>
+                    {(!evaluationResults || evalLoading) ? (
+                      <div className="h-8 w-16 bg-slate-100 animate-pulse rounded-lg mt-1" />
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
+                        {stats.possible}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships needing verification
                     </span>
@@ -788,9 +796,13 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     </div>
                   </div>
                   <div>
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
-                      {stats.ineligible}
-                    </span>
+                    {(!evaluationResults || evalLoading) ? (
+                      <div className="h-8 w-16 bg-slate-100 animate-pulse rounded-lg mt-1" />
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
+                        {stats.ineligible}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships you don't qualify for
                     </span>
@@ -813,9 +825,13 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     </div>
                   </div>
                   <div>
-                    <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
-                      {stats.total}
-                    </span>
+                    {(!evaluationResults || evalLoading) ? (
+                      <div className="h-8 w-16 bg-slate-100 animate-pulse rounded-lg mt-1" />
+                    ) : (
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 block leading-none">
+                        {stats.total}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-500 block mt-1.5 font-medium">
                       Scholarships found for you
                     </span>

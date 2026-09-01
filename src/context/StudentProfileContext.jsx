@@ -397,20 +397,13 @@ export const StudentProfileProvider = ({ children }) => {
   }, [currentUser?.id]);
 
   // ── Eligibility evaluation ────────────────────────────────────────────────────
-  const [evaluationResults, setEvaluationResults] = useState(() => {
-    return eligibilityService.evaluateAll(profile, scholarships);
-  });
-
-  useEffect(() => {
-    const evaluated = eligibilityService.evaluateAll(profile, scholarships);
-    setEvaluationResults(evaluated);
-  }, [profile, scholarships]);
+  const [evaluationResults, setEvaluationResults] = useState(null);
 
   const recalculateBackendEligibility = useCallback(async () => {
     if (currentUser?.id) {
       try {
         const backendEval = await eligibilityService.getEvaluations();
-        if (backendEval) {
+        if (backendEval && Array.isArray(backendEval.allResults) && backendEval.allResults.length > 0) {
           setEvaluationResults(backendEval);
           return backendEval;
         }
@@ -418,10 +411,16 @@ export const StudentProfileProvider = ({ children }) => {
         console.warn('[StudentProfileContext] Backend evaluation fetch notice:', err.message);
       }
     }
-    const localEval = eligibilityService.evaluateAll(profile, scholarships);
-    setEvaluationResults(localEval);
-    return localEval;
-  }, [currentUser?.id, profile, scholarships]);
+
+    // ONLY execute local evaluateAll if profile is confirmed completely loaded and scholarships available
+    const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
+    if (profileStatus === 'loaded' && isCompleted && Array.isArray(scholarships) && scholarships.length > 0) {
+      const localEval = eligibilityService.evaluateAll(profile, scholarships);
+      setEvaluationResults(localEval);
+      return localEval;
+    }
+    return null;
+  }, [currentUser?.id, profile, profileStatus, scholarships]);
 
   // ── Profile mutation ──────────────────────────────────────────────────────────
   const updateProfile = useCallback((updates) => {

@@ -33,34 +33,44 @@ export const eligibilityService = {
    * Fetches deterministic eligibility evaluations from Spring Boot backend.
    */
   async getEvaluations() {
-    try {
-      const data = await apiClient.get('/eligibility/results');
-      if (data && data.allResults && Array.isArray(data.allResults)) {
-        const allResults = data.allResults.map(normalizeResult);
-        const eligible = allResults.filter(r => r.isEligible || r.evaluationStatus === 'ELIGIBLE');
-        const possible = allResults.filter(r => !r.isEligible && (r.evaluationStatus === 'POSSIBLE_MATCH' || r.tier === 'POSSIBLE_MATCH'));
-        const ineligible = allResults.filter(r => !r.isEligible && r.evaluationStatus !== 'POSSIBLE_MATCH' && r.tier !== 'POSSIBLE_MATCH');
+    const data = await apiClient.get('/eligibility/results');
 
-        return {
-          allResults,
-          eligible,
-          possible,
-          ineligible,
-          strongMatches: eligible.filter(r => r.tier === 'STRONG_MATCH' || (r.matchScore || 0) >= 80),
-          goodMatches: eligible.filter(r => r.tier === 'GOOD_MATCH' || ((r.matchScore || 0) < 80 && (r.matchScore || 0) >= 50)),
-          possibleMatches: possible,
-          summary: data.summary || {
-            eligibleCount: eligible.length,
-            possibleCount: possible.length,
-            ineligibleCount: ineligible.length,
-            totalCount: allResults.length
-          }
-        };
-      }
-    } catch (err) {
-      console.warn('[EligibilityService] Backend evaluation fetch error:', err.message);
+    // Support all standard Spring Boot / ApiResponse wrapper result structures
+    const rawList = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.allResults)
+        ? data.allResults
+        : (Array.isArray(data?.results)
+          ? data.results
+          : (Array.isArray(data?.evaluations)
+            ? data.evaluations
+            : null)));
+
+    if (!rawList) {
+      console.warn('[EligibilityService] Unexpected backend evaluation response shape:', data);
+      throw new Error('Eligibility response did not contain expected results array');
     }
-    return null;
+
+    const allResults = rawList.map(normalizeResult);
+    const eligible = allResults.filter(r => r.isEligible || r.evaluationStatus === 'ELIGIBLE');
+    const possible = allResults.filter(r => !r.isEligible && (r.evaluationStatus === 'POSSIBLE_MATCH' || r.tier === 'POSSIBLE_MATCH'));
+    const ineligible = allResults.filter(r => !r.isEligible && r.evaluationStatus !== 'POSSIBLE_MATCH' && r.tier !== 'POSSIBLE_MATCH');
+
+    return {
+      allResults,
+      eligible,
+      possible,
+      ineligible,
+      strongMatches: eligible.filter(r => r.tier === 'STRONG_MATCH' || (!r.tier && (r.matchScore || 0) >= 80)),
+      goodMatches: eligible.filter(r => r.tier === 'GOOD_MATCH' || (!r.tier && (r.matchScore || 0) < 80)),
+      possibleMatches: possible,
+      summary: data?.summary || {
+        eligibleCount: eligible.length,
+        possibleCount: possible.length,
+        ineligibleCount: ineligible.length,
+        totalCount: allResults.length
+      }
+    };
   },
 
   /**
