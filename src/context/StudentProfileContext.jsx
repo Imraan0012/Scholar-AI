@@ -167,6 +167,34 @@ export const StudentProfileProvider = ({ children }) => {
     loadScholarshipsAsync();
   }, [loadScholarshipsAsync]);
 
+  // ── Eligibility evaluation calculation ─────────────────────────────────────────
+  const [evaluationResults, setEvaluationResults] = useState(null);
+
+  const recalculateBackendEligibility = useCallback(async (targetUser, targetProfile) => {
+    const user = targetUser || currentUser;
+    const activeProfile = targetProfile || profileRef.current;
+    const isCompleted = activeProfile?.onboardingComplete === true || activeProfile?.isOnboarded === true;
+
+    // First attempt: fetch deterministic evaluation from backend Spring Boot API
+    try {
+      const backendEval = await eligibilityService.getEvaluations();
+      if (backendEval && Array.isArray(backendEval.allResults) && backendEval.allResults.length > 0) {
+        setEvaluationResults(backendEval);
+        return backendEval;
+      }
+    } catch (err) {
+      console.warn('[StudentProfileContext] Backend evaluation fetch notice:', err.message);
+    }
+
+    // Fallback attempt: execute local evaluateAll ONLY if profile is completely loaded and valid
+    if (isCompleted && Array.isArray(scholarships) && scholarships.length > 0) {
+      const localEval = eligibilityService.evaluateAll(activeProfile, scholarships);
+      setEvaluationResults(localEval);
+      return localEval;
+    }
+    return null;
+  }, [currentUser, scholarships]);
+
   // ── Profile + auxiliary data loader ─────────────────────────────────────────
   const loadUserData = useCallback(async (user, { isRetry = false, isBackground = false } = {}) => {
     if (!user?.id) {
@@ -221,6 +249,7 @@ export const StudentProfileProvider = ({ children }) => {
         };
 
         setProfile(cleanProfile);
+        profileRef.current = cleanProfile;
         setProfileStatus('loaded');
         setProfileError(null);
 
@@ -231,7 +260,7 @@ export const StudentProfileProvider = ({ children }) => {
 
         // If profile is complete, fetch and calculate eligibility matches
         if (isCompleted) {
-          recalculateBackendEligibility().catch(err => {
+          recalculateBackendEligibility(user, cleanProfile).catch(err => {
             console.warn('[StudentProfileContext] Initial eligibility calculation notice:', err.message);
           });
         }
@@ -395,32 +424,6 @@ export const StudentProfileProvider = ({ children }) => {
       if (typeof unsubscribeNotifs === 'function') unsubscribeNotifs();
     };
   }, [currentUser?.id]);
-
-  // ── Eligibility evaluation ────────────────────────────────────────────────────
-  const [evaluationResults, setEvaluationResults] = useState(null);
-
-  const recalculateBackendEligibility = useCallback(async () => {
-    if (currentUser?.id) {
-      try {
-        const backendEval = await eligibilityService.getEvaluations();
-        if (backendEval && Array.isArray(backendEval.allResults) && backendEval.allResults.length > 0) {
-          setEvaluationResults(backendEval);
-          return backendEval;
-        }
-      } catch (err) {
-        console.warn('[StudentProfileContext] Backend evaluation fetch notice:', err.message);
-      }
-    }
-
-    // ONLY execute local evaluateAll if profile is confirmed completely loaded and scholarships available
-    const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
-    if (profileStatus === 'loaded' && isCompleted && Array.isArray(scholarships) && scholarships.length > 0) {
-      const localEval = eligibilityService.evaluateAll(profile, scholarships);
-      setEvaluationResults(localEval);
-      return localEval;
-    }
-    return null;
-  }, [currentUser?.id, profile, profileStatus, scholarships]);
 
   // ── Profile mutation ──────────────────────────────────────────────────────────
   const updateProfile = useCallback((updates) => {
