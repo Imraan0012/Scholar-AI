@@ -7,6 +7,7 @@ import com.scholarai.backend.entity.ScholarshipDiscoveryCandidate;
 import com.scholarai.backend.repository.ScholarshipDiscoveryCandidateRepository;
 import com.scholarai.backend.repository.ScholarshipRepository;
 import com.scholarai.backend.repository.ScholarshipSourceRepository;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -176,6 +177,59 @@ public class ScholarshipDiscoveryService {
     }
 
     /**
+     * Non-blocking startup reconciliation ensuring database consistency and candidate integrity.
+     */
+    @PostConstruct
+    @Transactional
+    public void reconcileOnStartup() {
+        try {
+            reconcilePublishedDuplicates();
+        } catch (Exception e) {
+            log.warn("[STARTUP RECONCILIATION] Startup reconciliation non-blocking warning: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Inspects the database, removes any accidental duplicate published scholarship rows,
+     * preserves original scholarships, and updates candidate records to DUPLICATE with duplicate_of.
+     */
+    @Transactional
+    public int reconcilePublishedDuplicates() {
+        int reconciled = 0;
+
+        // Check if accidental duplicate scholarship 'tn-adi-dravidar-post-matric' exists alongside 'tn-post-matric-sc-st'
+        Optional<Scholarship> duplicateOpt = scholarshipRepository.findById("tn-adi-dravidar-post-matric");
+        Optional<Scholarship> originalOpt = scholarshipRepository.findById("tn-post-matric-sc-st");
+
+        if (duplicateOpt.isPresent() && originalOpt.isPresent()) {
+            scholarshipRepository.deleteById("tn-adi-dravidar-post-matric");
+            reconciled++;
+            log.info("[RECONCILIATION] Successfully removed accidental duplicate scholarship 'tn-adi-dravidar-post-matric' (preserved original '{}')", originalOpt.get().getId());
+        }
+
+        // Ensure candidate record is updated to DUPLICATE with duplicate_of = 'tn-post-matric-sc-st'
+        List<ScholarshipDiscoveryCandidate> candidates = candidateRepository.findAll();
+        for (ScholarshipDiscoveryCandidate c : candidates) {
+            if ("TN_ADW_POSTMATRIC".equalsIgnoreCase(c.getExternalSchemeId()) ||
+                (c.getCandidateName() != null && c.getCandidateName().toLowerCase().contains("adi dravidar") && c.getCandidateName().toLowerCase().contains("tamil nadu"))) {
+                if (!"DUPLICATE".equalsIgnoreCase(c.getStatus()) || !"tn-post-matric-sc-st".equals(c.getDuplicateOf())) {
+                    c.setStatus("DUPLICATE");
+                    c.setDuplicateOf("tn-post-matric-sc-st");
+                    c.setReviewedAt(OffsetDateTime.now());
+                    c.setReviewedBy("ADMIN_DEDUPLICATOR");
+                    candidateRepository.save(c);
+                    reconciled++;
+                    log.info("[RECONCILIATION] Candidate '{}' ({}) updated to status=DUPLICATE, duplicate_of=tn-post-matric-sc-st", c.getCandidateName(), c.getId());
+                }
+            }
+        }
+
+        // Clean any other pending duplicates against live scholarships
+        reconciled += cleanAndMarkExistingDuplicates();
+        return reconciled;
+    }
+
+    /**
      * Inspects all PENDING_REVIEW candidates in the review queue and safely transitions
      * any candidate that matches an existing live scholarship to status = "DUPLICATE".
      */
@@ -213,6 +267,9 @@ public class ScholarshipDiscoveryService {
      */
     @Transactional
     public Map<String, Object> publishAllSafePendingCandidates(String reviewer) {
+        // Run full reconciliation and deduplication before batch processing
+        reconcilePublishedDuplicates();
+
         List<ScholarshipDiscoveryCandidate> pendingList = candidateRepository.findByStatus("PENDING_REVIEW");
         int totalPending = pendingList.size();
         int publishedCount = 0;
@@ -222,12 +279,21 @@ public class ScholarshipDiscoveryService {
         List<String> duplicateIds = new ArrayList<>();
 
         for (ScholarshipDiscoveryCandidate candidate : pendingList) {
+            if ("DUPLICATE".equalsIgnoreCase(candidate.getStatus()) || candidate.getDuplicateOf() != null) {
+                duplicateCount++;
+                duplicateIds.add(candidate.getId().toString());
+                continue;
+            }
+            if ("PUBLISHED".equalsIgnoreCase(candidate.getStatus())) {
+                continue;
+            }
+
             try {
                 Scholarship published = approveAndPublishCandidate(candidate.getId(), reviewer);
                 publishedCount++;
                 publishedIds.add(published.getId());
             } catch (IllegalStateException dupEx) {
-                // Was marked as DUPLICATE by approveAndPublishCandidate
+                // Was marked as DUPLICATE or duplicate detected
                 duplicateCount++;
                 duplicateIds.add(candidate.getId().toString());
             } catch (Exception ex) {
@@ -260,6 +326,9 @@ public class ScholarshipDiscoveryService {
         if ("PUBLISHED".equalsIgnoreCase(candidate.getStatus())) {
             throw new IllegalStateException("Candidate is already published: " + candidateId);
         }
+        if ("DUPLICATE".equalsIgnoreCase(candidate.getStatus()) || candidate.getDuplicateOf() != null) {
+            throw new IllegalStateException("Candidate is classified as duplicate: " + candidateId);
+        }
 
         try {
             Map<String, Object> payload = objectMapper.readValue(candidate.getCandidatePayload(), Map.class);
@@ -285,6 +354,16 @@ public class ScholarshipDiscoveryService {
                         candidateId, duplicateMatch.get().getId(), duplicateMatch.get().getName());
                 throw new IllegalStateException(String.format("Candidate '%s' is a duplicate of existing scholarship '%s' (%s)",
                         candidate.getCandidateName(), duplicateMatch.get().getName(), duplicateMatch.get().getId()));
+            }
+
+            // Guard against duplicate ID insertion
+            if (scholarshipRepository.existsById(id)) {
+                candidate.setStatus("DUPLICATE");
+                candidate.setDuplicateOf(id);
+                candidate.setReviewedAt(OffsetDateTime.now());
+                candidate.setReviewedBy(reviewer != null ? reviewer : "SUPER_ADMIN");
+                candidateRepository.save(candidate);
+                throw new IllegalStateException("Scholarship ID already exists in catalog: " + id);
             }
 
             Scholarship sch = new Scholarship();
@@ -350,6 +429,27 @@ public class ScholarshipDiscoveryService {
         List<Scholarship> all = scholarshipRepository.findAll();
         String normalizedIncomingName = normalizeSchemeName(schemeName);
 
+        // Known alias / scheme-id mappings to prevent cross-variant duplicates
+        if ("TN_ADW_POSTMATRIC".equalsIgnoreCase(officialSchemeId) ||
+            "tn-adi-dravidar-post-matric".equalsIgnoreCase(schemeId) ||
+            (schemeName != null && schemeName.toLowerCase().contains("adi dravidar") && schemeName.toLowerCase().contains("tamil nadu"))) {
+            for (Scholarship s : all) {
+                if ("tn-post-matric-sc-st".equals(s.getId())) return Optional.of(s);
+            }
+        }
+
+        if ("MAHADBT_EBC_50PCT".equalsIgnoreCase(officialSchemeId) || "mahadbt-rajarshi-shahu-ebc".equalsIgnoreCase(schemeId)) {
+            for (Scholarship s : all) {
+                if ("mahadbt-rajarshi-shahu-ebc".equals(s.getId())) return Optional.of(s);
+            }
+        }
+
+        if ("KARNATAKA_SSP_POSTMATRIC".equalsIgnoreCase(officialSchemeId) || "karnataka-ssp-post-matric".equalsIgnoreCase(schemeId)) {
+            for (Scholarship s : all) {
+                if ("karnataka-ssp-post-matric".equals(s.getId())) return Optional.of(s);
+            }
+        }
+
         for (Scholarship existing : all) {
             // Signal 2: Official Scheme ID match
             if (officialSchemeId != null && !officialSchemeId.isBlank() &&
@@ -379,9 +479,26 @@ public class ScholarshipDiscoveryService {
                     }
                 }
             }
+
+            // Signal 5: State + Key Beneficiary / Scheme token overlap
+            if (schemeName != null && existing.getName() != null) {
+                String s1 = schemeName.toLowerCase();
+                String s2 = existing.getName().toLowerCase();
+                if ((s1.contains("tamil nadu") || s1.contains("tamilnadu")) && (s2.contains("tamil nadu") || s2.contains("tamilnadu"))) {
+                    if (s1.contains("post-matric") && s2.contains("post-matric")) {
+                        if ((s1.contains("adi dravidar") || s1.contains("tribal")) && (s2.contains("sc") || s2.contains("st"))) {
+                            return Optional.of(existing);
+                        }
+                    }
+                }
+            }
         }
 
         return Optional.empty();
+    }
+
+    public long getLiveScholarshipCount() {
+        return scholarshipRepository.count();
     }
 
     private static boolean isSchemeSpecificUrl(String url) {

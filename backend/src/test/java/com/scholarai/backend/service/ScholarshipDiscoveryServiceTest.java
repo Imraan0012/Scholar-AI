@@ -366,4 +366,124 @@ class ScholarshipDiscoveryServiceTest {
 
         assertTrue(match.isEmpty(), "Distinct schemes from same ministry must not be marked duplicate");
     }
+
+    @Test
+    void test8_TamilNaduAdiDravidarCandidateIsRecognizedAsDuplicateOfPostMatricScSt() {
+        Scholarship existing = new Scholarship();
+        existing.setId("tn-post-matric-sc-st");
+        existing.setName("Tamil Nadu Post-Matric Scholarship for SC, ST & SCC Students");
+        existing.setState("TAMIL_NADU");
+
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existing));
+
+        Optional<Scholarship> match = discoveryService.findDuplicateScholarship(
+                "tn-adi-dravidar-post-matric",
+                "Tamil Nadu Adi Dravidar and Tribal Welfare Post-Matric Scholarship",
+                "TN_ADW_POSTMATRIC",
+                "Adi Dravidar and Tribal Welfare Department, Govt. of Tamil Nadu",
+                "https://tn.gov.in"
+        );
+
+        assertTrue(match.isPresent(), "TN Adi Dravidar candidate must be recognized as duplicate of tn-post-matric-sc-st");
+        assertEquals("tn-post-matric-sc-st", match.get().getId());
+    }
+
+    @Test
+    void test9_BatchWith14SafeNewAnd1DuplicatePublishesExactly14() {
+        List<ScholarshipDiscoveryCandidate> candidates = new ArrayList<>();
+        Map<UUID, ScholarshipDiscoveryCandidate> candidateMap = new HashMap<>();
+
+        // Create 14 SAFE_NEW candidates
+        for (int i = 1; i <= 14; i++) {
+            ScholarshipDiscoveryCandidate safe = new ScholarshipDiscoveryCandidate();
+            UUID id = UUID.randomUUID();
+            safe.setId(id);
+            safe.setCandidateName("Genuine Safe New Scheme " + i);
+            safe.setProvider("Provider " + i);
+            safe.setExternalSchemeId("SCHEME_SAFE_" + i);
+            safe.setCandidatePayload("{\"id\":\"safe-sch-" + i + "\",\"name\":\"Genuine Safe New Scheme " + i + "\",\"provider\":\"Provider " + i + "\"}");
+            safe.setStatus("PENDING_REVIEW");
+            candidates.add(safe);
+            candidateMap.put(id, safe);
+        }
+
+        // Create 1 DUPLICATE candidate (TN Adi Dravidar matching tn-post-matric-sc-st)
+        ScholarshipDiscoveryCandidate dup = new ScholarshipDiscoveryCandidate();
+        UUID dupId = UUID.randomUUID();
+        dup.setId(dupId);
+        dup.setCandidateName("Tamil Nadu Adi Dravidar and Tribal Welfare Post-Matric Scholarship");
+        dup.setProvider("Adi Dravidar and Tribal Welfare Department");
+        dup.setExternalSchemeId("TN_ADW_POSTMATRIC");
+        dup.setCandidatePayload("{\"id\":\"tn-adi-dravidar-post-matric\",\"name\":\"Tamil Nadu Adi Dravidar and Tribal Welfare Post-Matric Scholarship\",\"provider\":\"Adi Dravidar Dept\"}");
+        dup.setStatus("PENDING_REVIEW");
+        candidates.add(dup);
+        candidateMap.put(dupId, dup);
+
+        Scholarship existingLive = new Scholarship();
+        existingLive.setId("tn-post-matric-sc-st");
+        existingLive.setName("Tamil Nadu Post-Matric Scholarship for SC, ST & SCC Students");
+
+        when(candidateRepository.findByStatus("PENDING_REVIEW")).thenReturn(candidates);
+        when(candidateRepository.findById(any(UUID.class))).thenAnswer(inv -> Optional.ofNullable(candidateMap.get(inv.getArgument(0))));
+        when(scholarshipRepository.findAll()).thenReturn(List.of(existingLive));
+        when(scholarshipRepository.save(any(Scholarship.class))).thenAnswer(i -> i.getArgument(0));
+        when(candidateRepository.save(any(ScholarshipDiscoveryCandidate.class))).thenAnswer(i -> i.getArgument(0));
+
+        Map<String, Object> summary = discoveryService.publishAllSafePendingCandidates("ADMIN_REVIEWER");
+
+        assertNotNull(summary);
+        assertEquals(15, summary.get("totalPendingEvaluated"));
+        assertEquals(14, summary.get("publishedCount"), "Must publish exactly 14 scholarships");
+        assertEquals(1, summary.get("duplicateCount"), "Must detect exactly 1 duplicate");
+        assertEquals(0, summary.get("failedCount"));
+
+        // Verify duplicate candidate was updated to DUPLICATE with duplicate_of
+        assertEquals("DUPLICATE", dup.getStatus());
+        assertEquals("tn-post-matric-sc-st", dup.getDuplicateOf());
+        verify(scholarshipRepository, times(14)).save(any(Scholarship.class));
+    }
+
+    @Test
+    void test10_RepeatedPublishSafeCallInsertsZeroAdditionalRows() {
+        // When candidates are already PUBLISHED or DUPLICATE, pending is empty
+        when(candidateRepository.findByStatus("PENDING_REVIEW")).thenReturn(Collections.emptyList());
+
+        Map<String, Object> summary = discoveryService.publishAllSafePendingCandidates("ADMIN_REVIEWER");
+
+        assertEquals(0, summary.get("totalPendingEvaluated"));
+        assertEquals(0, summary.get("publishedCount"));
+        assertEquals(0, summary.get("duplicateCount"));
+        verify(scholarshipRepository, never()).save(any(Scholarship.class));
+    }
+
+    @Test
+    void test11_ReconcilePublishedDuplicatesRemovesAccidentalDuplicateRowAndPreservesOriginal() {
+        Scholarship accidental = new Scholarship();
+        accidental.setId("tn-adi-dravidar-post-matric");
+        accidental.setName("Tamil Nadu Adi Dravidar and Tribal Welfare Post-Matric Scholarship");
+
+        Scholarship original = new Scholarship();
+        original.setId("tn-post-matric-sc-st");
+        original.setName("Tamil Nadu Post-Matric Scholarship for SC, ST & SCC Students");
+
+        ScholarshipDiscoveryCandidate candidate = new ScholarshipDiscoveryCandidate();
+        candidate.setId(UUID.randomUUID());
+        candidate.setExternalSchemeId("TN_ADW_POSTMATRIC");
+        candidate.setCandidateName("Tamil Nadu Adi Dravidar and Tribal Welfare Post-Matric Scholarship");
+        candidate.setStatus("PUBLISHED");
+
+        when(scholarshipRepository.findById("tn-adi-dravidar-post-matric")).thenReturn(Optional.of(accidental));
+        when(scholarshipRepository.findById("tn-post-matric-sc-st")).thenReturn(Optional.of(original));
+        when(candidateRepository.findAll()).thenReturn(List.of(candidate));
+        when(candidateRepository.findByStatus("PENDING_REVIEW")).thenReturn(Collections.emptyList());
+        when(candidateRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        int reconciled = discoveryService.reconcilePublishedDuplicates();
+
+        assertTrue(reconciled >= 1);
+        verify(scholarshipRepository, times(1)).deleteById("tn-adi-dravidar-post-matric");
+        verify(scholarshipRepository, never()).deleteById("tn-post-matric-sc-st");
+        assertEquals("DUPLICATE", candidate.getStatus());
+        assertEquals("tn-post-matric-sc-st", candidate.getDuplicateOf());
+    }
 }

@@ -159,6 +159,25 @@ public class AdminSyncController {
     }
 
     /**
+     * Reconciles accidental duplicate scholarships and ensures candidate integrity.
+     */
+    @PostMapping({"/reconcile", "/discovery/reconcile"})
+    public ResponseEntity<ApiResponse<Map<String, Object>>> reconcileDuplicates(
+            @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret) {
+
+        if (!isAuthorized(headerSecret)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Forbidden: Invalid or missing X-Scheduler-Secret header"));
+        }
+
+        int count = discoveryService.reconcilePublishedDuplicates();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("reconciledCount", count);
+        result.put("liveScholarshipCount", discoveryService.getLiveScholarshipCount());
+        return ResponseEntity.ok(ApiResponse.success("Reconciliation completed successfully", result));
+    }
+
+    /**
      * Returns comprehensive all-India scholarship source coverage matrix report.
      */
     @GetMapping({"/coverage-report", "/discovery/coverage-report"})
