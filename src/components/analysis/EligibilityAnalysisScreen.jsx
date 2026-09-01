@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2 } from 'lucide-react';
+import { useStudentProfile } from '../../context/StudentProfileContext';
 
 const ANALYSIS_STEPS = [
   {
@@ -31,8 +32,17 @@ const ANALYSIS_STEPS = [
 ];
 
 export default function EligibilityAnalysisScreen({ onAnalysisComplete }) {
+  const { recalculateBackendEligibility } = useStudentProfile();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+
+  useEffect(() => {
+    if (typeof recalculateBackendEligibility === 'function') {
+      recalculateBackendEligibility().catch(err => {
+        console.warn('[EligibilityAnalysisScreen] Recalculation notice:', err.message);
+      });
+    }
+  }, [recalculateBackendEligibility]);
 
   useEffect(() => {
     if (currentStepIndex < ANALYSIS_STEPS.length) {

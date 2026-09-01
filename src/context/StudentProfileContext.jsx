@@ -162,6 +162,11 @@ export const StudentProfileProvider = ({ children }) => {
     });
   }, []);
 
+  // Fetch live scholarship catalog on initial app mount
+  useEffect(() => {
+    loadScholarshipsAsync();
+  }, [loadScholarshipsAsync]);
+
   // ── Profile + auxiliary data loader ─────────────────────────────────────────
   const loadUserData = useCallback(async (user, { isRetry = false, isBackground = false } = {}) => {
     if (!user?.id) {
@@ -174,6 +179,9 @@ export const StudentProfileProvider = ({ children }) => {
       setNotifications([]);
       return;
     }
+
+    // Refresh scholarship catalog alongside user data
+    loadScholarshipsAsync();
 
     if (isBackground) {
       setProfileRefreshing(true);
@@ -220,6 +228,13 @@ export const StudentProfileProvider = ({ children }) => {
         try {
           profileService.saveOnboardingProgress(step, cleanProfile, user.id);
         } catch (e) { }
+
+        // If profile is complete, fetch and calculate eligibility matches
+        if (isCompleted) {
+          recalculateBackendEligibility().catch(err => {
+            console.warn('[StudentProfileContext] Initial eligibility calculation notice:', err.message);
+          });
+        }
       } else {
         console.log('[PROFILE] profileExists=false onboardingCompleted=false onboardingStep=1');
         // If we already have a loaded, completed profile in memory, do NOT downgrade to not_found on empty background sync

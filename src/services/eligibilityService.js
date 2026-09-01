@@ -2,20 +2,24 @@
 // SCHOLAR AI — DETERMINISTIC ELIGIBILITY SERVICE (SPRING BOOT REST INTEGRATION)
 // =============================================================================
 
-import { apiClient } from './apiClient';
-import { evaluateAllScholarships } from '../engine/eligibilityEngine';
-import { normalizeScholarship } from './scholarshipService';
+import { apiClient } from './apiClient.js';
+import { evaluateAllScholarships } from '../engine/eligibilityEngine.js';
+import { normalizeScholarship } from './scholarshipService.js';
 
 function normalizeResult(r) {
   if (!r) return r;
   const sch = normalizeScholarship(r.scholarship);
+  const isElig = r.isEligible !== undefined ? r.isEligible : (r.eligible !== undefined ? r.eligible : (r.evaluationStatus === 'ELIGIBLE'));
+  const tier = r.tier || (isElig ? 'STRONG_MATCH' : (r.evaluationStatus === 'POSSIBLE_MATCH' ? 'POSSIBLE_MATCH' : 'INELIGIBLE'));
   return {
     ...r,
     scholarship: sch,
     scholarshipId: r.scholarshipId || sch?.id,
     scholarshipName: r.scholarshipName || sch?.name,
-    isEligible: r.isEligible !== undefined ? r.isEligible : (r.evaluationStatus === 'ELIGIBLE'),
-    tier: r.tier || (r.evaluationStatus === 'ELIGIBLE' ? 'STRONG_MATCH' : (r.evaluationStatus === 'POSSIBLE_MATCH' ? 'POSSIBLE_MATCH' : 'INELIGIBLE')),
+    isEligible: isElig,
+    eligible: isElig,
+    evaluationStatus: r.evaluationStatus || (isElig ? 'ELIGIBLE' : (tier === 'POSSIBLE_MATCH' ? 'POSSIBLE_MATCH' : 'NOT_ELIGIBLE')),
+    tier,
     matchScore: r.matchScore !== undefined ? r.matchScore : 50,
     matchedCriteria: r.matchedCriteria || [],
     failedCriteria: r.failedCriteria || [],
@@ -33,17 +37,17 @@ export const eligibilityService = {
       const data = await apiClient.get('/eligibility/results');
       if (data && data.allResults && Array.isArray(data.allResults)) {
         const allResults = data.allResults.map(normalizeResult);
-        const eligible = allResults.filter(r => r.evaluationStatus === 'ELIGIBLE');
-        const possible = allResults.filter(r => r.evaluationStatus === 'POSSIBLE_MATCH');
-        const ineligible = allResults.filter(r => r.evaluationStatus === 'NOT_ELIGIBLE');
+        const eligible = allResults.filter(r => r.isEligible || r.evaluationStatus === 'ELIGIBLE');
+        const possible = allResults.filter(r => !r.isEligible && (r.evaluationStatus === 'POSSIBLE_MATCH' || r.tier === 'POSSIBLE_MATCH'));
+        const ineligible = allResults.filter(r => !r.isEligible && r.evaluationStatus !== 'POSSIBLE_MATCH' && r.tier !== 'POSSIBLE_MATCH');
 
         return {
           allResults,
           eligible,
           possible,
           ineligible,
-          strongMatches: eligible.filter(r => r.tier === 'STRONG_MATCH'),
-          goodMatches: eligible.filter(r => r.tier === 'GOOD_MATCH'),
+          strongMatches: eligible.filter(r => r.tier === 'STRONG_MATCH' || (r.matchScore || 0) >= 80),
+          goodMatches: eligible.filter(r => r.tier === 'GOOD_MATCH' || ((r.matchScore || 0) < 80 && (r.matchScore || 0) >= 50)),
           possibleMatches: possible,
           summary: data.summary || {
             eligibleCount: eligible.length,

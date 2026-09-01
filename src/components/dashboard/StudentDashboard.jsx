@@ -138,6 +138,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
     profile = {},
     updateProfile,
     evaluationResults,
+    recalculateBackendEligibility,
     savedApplications,
     saveApplication,
     updateApplicationStatus,
@@ -177,8 +178,25 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showClearApplicationsModal, setShowClearApplicationsModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [evalError, setEvalError] = useState(null);
   const userMenuRef = useRef(null);
   const scrollContainerRef = useRef(null);
+
+  // Auto-fetch eligibility evaluations if not already present for completed user
+  useEffect(() => {
+    const isCompleted = profile?.onboardingComplete === true || profile?.isOnboarded === true;
+    const currentResults = evaluationResults?.allResults || [];
+    if (currentResults.length === 0 && isCompleted && typeof recalculateBackendEligibility === 'function') {
+      setEvalLoading(true);
+      recalculateBackendEligibility()
+        .catch((err) => {
+          console.warn('[StudentDashboard] Eligibility recalculation notice:', err.message);
+          setEvalError(err.message);
+        })
+        .finally(() => setEvalLoading(false));
+    }
+  }, [evaluationResults?.allResults?.length, profile?.onboardingComplete, profile?.isOnboarded, recalculateBackendEligibility]);
 
   // Scroll main container to top when navigating views
   useEffect(() => {
@@ -926,7 +944,35 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                   </span>
                 </div>
 
-                {filteredScholarships.length === 0 ? (
+                {evalLoading ? (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3">
+                    <Loader2 className="w-8 h-8 text-[#2563EB] animate-spin mx-auto" />
+                    <h3 className="text-base font-bold text-slate-800">Analyzing scholarships against your profile...</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      Evaluating central, state, and corporate schemes against your eligibility parameters.
+                    </p>
+                  </div>
+                ) : evalError && allResults.length === 0 ? (
+                  <div className="bg-white border border-rose-200 rounded-2xl p-12 text-center space-y-3">
+                    <AlertCircle className="w-8 h-8 text-rose-500 mx-auto" />
+                    <h3 className="text-base font-bold text-slate-800">Unable to load scholarship matches</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      There was a problem loading your personalized scholarship matches.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setEvalLoading(true);
+                        recalculateBackendEligibility()
+                          .then(() => setEvalError(null))
+                          .catch((err) => setEvalError(err.message))
+                          .finally(() => setEvalLoading(false));
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#2563EB] text-white text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Retry Analysis
+                    </button>
+                  </div>
+                ) : filteredScholarships.length === 0 ? (
                   <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3">
                     <FileText className="w-10 h-10 text-slate-300 mx-auto" />
                     <h3 className="text-base font-bold text-slate-800">No scholarships found</h3>
