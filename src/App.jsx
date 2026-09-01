@@ -359,7 +359,7 @@ function MainAppContent() {
   const isLightPage = activeView === 'onboarding' || activeView === 'analysis' || activeView === 'results' || activeView === 'dashboard';
 
   return (
-    <div className={`relative min-h-screen ${isLightPage ? 'bg-[#F8F9FB] text-slate-900' : 'bg-[#030d17] text-white'} flex flex-col selection:bg-blue-600 selection:text-white transition-colors duration-300`}>
+    <div className={`relative min-h-screen w-full ${isLightPage ? 'bg-[#F8F9FB] text-slate-900' : 'bg-[#030d17] text-white'} flex flex-col selection:bg-blue-600 selection:text-white transition-colors duration-300`}>
       {/* Scroll Progress Bar - Landing Only */}
       {isLandingPage && <ScrollProgress />}
 
@@ -396,7 +396,7 @@ function MainAppContent() {
       )}
 
       {/* Main View Router */}
-      <main className={`flex-grow z-10 ${isLandingPage ? 'pt-4' : 'pt-0'}`}>
+      <main className={`flex-grow z-10 w-full ${isLandingPage ? 'pt-4' : 'pt-0'}`}>
         <AnimatePresence mode="wait">
           {/* VIEW 1: LANDING PAGE */}
           {activeView === 'landing' && (
@@ -405,6 +405,7 @@ function MainAppContent() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              className="w-full flex flex-col items-center"
             >
               <HeroSection
                 currentUser={currentUser}
