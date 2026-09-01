@@ -49,17 +49,17 @@ export default function BuiltForIndiaSection({ onCheckEligibilityClick }) {
     },
     {
       id: 'location',
-      title: '04. State Domicile',
+      title: '04. State of Residence',
       subtitle: '28 States & 8 Union Territories',
       icon3d: '/icon_location.jpg',
       badgeColor: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
       points: [
         'MahaDBT (MH), SSP (KA), e-Kalyan (JH/BR), OASIS (WB), Medhabruti (OD)',
-        'State-exclusive domicile quota scholarship matching',
+        'State-exclusive residence quota scholarship matching',
         'National Scholarship Portal (NSP) direct scheme matching',
         'North-East (NER Ishan Uday) & J&K PMSSS special grant support'
       ],
-      tag: 'Domicile Dimension'
+      tag: 'State Dimension'
     }
   ];
 

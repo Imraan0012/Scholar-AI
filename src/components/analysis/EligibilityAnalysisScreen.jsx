@@ -6,7 +6,7 @@ const ANALYSIS_STEPS = [
   {
     id: 1,
     title: 'Profile information',
-    description: 'Reviewing basic details, category, and state domicile'
+    description: 'Reviewing basic details, category, and state of residence'
   },
   {
     id: 2,

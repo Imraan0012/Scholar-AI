@@ -237,7 +237,7 @@ export function evaluateDecisionNode(rule, profile, scholarship) {
         detail = `Open to students across all States and UTs in India`;
       } else if (!studentState) {
         unknown = true;
-        detail = 'State domicile proof is required for state-specific quota';
+        detail = 'State of residence confirmation is required for state-specific quota';
       } else {
         passed = targetStates.some(s => {
           const normTarget = normalizeState(s);
@@ -245,8 +245,8 @@ export function evaluateDecisionNode(rule, profile, scholarship) {
         });
 
         detail = passed
-          ? `State domicile (${profile.domicileState}) satisfies requirement`
-          : `Restricted to native domicile holders of [${targetStates.join(', ')}] (Your domicile: ${profile.domicileState || 'Unspecified'})`;
+          ? `State of residence (${profile.domicileState}) satisfies requirement`
+          : `Restricted to residents of [${targetStates.join(', ')}] (Your state of residence: ${profile.domicileState || 'Unspecified'})`;
       }
       break;
     }
@@ -555,7 +555,7 @@ export function evaluateScholarship(profile, scholarship) {
   // Generate audit-grade human explanation
   let explanation = '';
   if (evaluationStatus === 'ELIGIBLE') {
-    explanation = `Decision Tree verified: You meet 100% of the mandatory requirements for ${scholarship.name}. Your academic score, family income, domicile state (${profile.domicileState || 'Pan-India'}), and category (${profile.category || 'General'}) fully qualify.`;
+    explanation = `Decision Tree verified: You meet 100% of the mandatory requirements for ${scholarship.name}. Your academic score, family income, state of residence (${profile.domicileState || 'Pan-India'}), and category (${profile.category || 'General'}) fully qualify.`;
   } else if (evaluationStatus === 'POSSIBLE_MATCH') {
     explanation = `Potential opportunity: Core eligibility verified, but supplementary verification is needed (${unknownRequirements.join('; ') || 'income / enrollment proof'}).`;
   } else {

@@ -15,7 +15,7 @@ export default function YourMatchesPreview({ onCheckEligibilityClick }) {
       reasons: [
         "Enrolled in 1st year AICTE-approved B.Tech / Diploma",
         "Family income documented below ₹8,00,000 / year",
-        "State domicile verification supported"
+        "State of residence verification supported"
       ],
       deadline: "Open for 2026-27 Portal"
     },

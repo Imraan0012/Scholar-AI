@@ -10,7 +10,7 @@ export default function HowItWorksSection({ onCheckEligibilityClick }) {
       stepTag: "Input Profile",
       title: "Tell Us About You",
       subtitle: "Personal, Academic & Financial Background",
-      desc: "Provide basic parameters: Course, CGPA/Marks, Family Annual Income, Category (General, OBC, SC, ST, EWS), and State Domicile.",
+      desc: "Provide basic parameters: Course, CGPA/Marks, Family Annual Income, Category (General, OBC, SC, ST, EWS), and State of Residence.",
       icon: UserCheck,
       color: "from-blue-500 to-indigo-600",
       accent: "text-indigo-400",

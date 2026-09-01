@@ -24,13 +24,13 @@ const ONBOARDING_STEPS = [
   },
   {
     id: 4,
-    title: 'Category & domicile',
+    title: 'Category & state of residence',
     subtitle: 'Information required for applicable state, category and quota-based scholarships.'
   },
   {
     id: 5,
     title: 'Additional information',
-    subtitle: 'Other details that may unlock special schemes and document requirements.'
+    subtitle: 'Other details that may unlock special schemes and optional document readiness.'
   }
 ];
 
@@ -458,7 +458,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
         errors.category = 'Social category is required.';
       }
       if (!d.domicileState) {
-        errors.domicileState = 'Permanent domicile state is required.';
+        errors.domicileState = 'State of residence is required.';
       }
       if (d.currentPincode && String(d.currentPincode).trim() !== '') {
         const cleanPin = String(d.currentPincode).replace(/[^0-9]/g, '');
@@ -1765,7 +1765,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                         STEP 4 OF 5
                       </span>
                       <h2 className="text-[26px] sm:text-[28px] font-bold text-slate-900 tracking-[-0.02em] mt-1">
-                        Category & domicile
+                        Category & state of residence
                       </h2>
                       <p className="text-[14px] text-slate-500 mt-1">
                         Information required for applicable state, category and quota-based scholarships.
@@ -1883,11 +1883,14 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                         </motion.div>
                       )}
 
-                      {/* Domicile State */}
+                      {/* State of Residence */}
                       <div>
-                        <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">
-                          Permanent domicile state <span className="text-red-500">*</span>
+                        <label className="block text-[13px] font-semibold text-slate-700 mb-1">
+                          State of Residence <span className="text-red-500">*</span>
                         </label>
+                        <span className="text-[12px] text-slate-500 block mb-1.5 font-normal">
+                          Select your primary state of residence.
+                        </span>
                         <select
                           value={formData.domicileState || 'Maharashtra'}
                           onChange={(e) => handleChange('domicileState', e.target.value)}
@@ -1903,16 +1906,17 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">
-                            Domicile certificate
+                            Domicile Certificate available?
                           </label>
                           <select
                             value={formData.domicileCertStatus || 'AVAILABLE'}
                             onChange={(e) => handleChange('domicileCertStatus', e.target.value)}
                             className="w-full h-[46px] px-4 text-[14px] bg-white border border-[#CBD5E1] rounded-[10px] text-slate-800 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/15 focus:border-blue-600 transition-colors"
                           >
-                            <option value="AVAILABLE">Available</option>
-                            <option value="NOT_AVAILABLE">Not available</option>
+                            <option value="AVAILABLE">Yes</option>
+                            <option value="NOT_AVAILABLE">No</option>
                             <option value="APPLIED">Applied / Pending</option>
+                            <option value="NA">Not applicable</option>
                           </select>
                         </div>
 
@@ -2259,36 +2263,35 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                         )}
                       </div>
 
-                      {/* DOCUMENT CHECKLIST READINESS SECTION */}
+                      {/* DOCUMENT READINESS SECTION (OPTIONAL & NON-BLOCKING) */}
                       <div className="pt-3 border-t border-slate-100">
-                        <div className="flex items-center justify-between mb-2.5">
-                          <label className="block text-[13px] font-semibold text-slate-700">
-                            Document & Marksheet Uploads ({dynamicDocuments.filter(d => (formData.uploadedFiles || {})[d.id] || (formData.uploadedDocumentIds || []).includes(d.id)).length} of {dynamicDocuments.length} uploaded)
+                        <div className="mb-3">
+                          <label className="block text-[13.5px] font-bold text-slate-900">
+                            Document Readiness
                           </label>
-                          <span className="text-[11.5px] font-medium text-slate-500">
-                            Upload marksheet/proof or leaves as pending
-                          </span>
+                          <p className="text-[12px] text-slate-500 mt-0.5">
+                            Optional — let us know which documents you already have. You will upload required documents on the official scholarship portal when you apply.
+                          </p>
                         </div>
                         
-                        <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                           {dynamicDocuments.map((doc) => {
-                            const uploadedFile = (formData.uploadedFiles || {})[doc.id];
-                            const isUploaded = Boolean(uploadedFile || (formData.uploadedDocumentIds || []).includes(doc.id));
+                            const currentStatus = (formData.documentStatuses || {})[doc.id] || (formData.uploadedFiles?.[doc.id] ? 'YES' : 'NOT_SURE');
                             
                             return (
                               <div
                                 key={doc.id}
                                 className={`p-3 px-3.5 rounded-[12px] border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[13px] ${
-                                  isUploaded 
-                                    ? 'bg-emerald-50/50 border-emerald-200/80 shadow-2xs' 
-                                    : 'bg-slate-50/80 border-slate-200 hover:border-slate-300'
+                                  currentStatus === 'YES' 
+                                    ? 'bg-emerald-50/50 border-emerald-200 shadow-2xs' 
+                                    : 'bg-slate-50/80 border-slate-200'
                                 }`}
                               >
                                 <div className="flex items-start gap-2.5 min-w-0">
                                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                    isUploaded ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/70 text-slate-500'
+                                    currentStatus === 'YES' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/70 text-slate-500'
                                   }`}>
-                                    {isUploaded ? (
+                                    {currentStatus === 'YES' ? (
                                       <FileCheck className="w-4 h-4" />
                                     ) : (
                                       <FileText className="w-4 h-4" />
@@ -2299,75 +2302,42 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                                     <span className="text-slate-900 font-semibold block truncate">
                                       {doc.name}
                                     </span>
-                                    {isUploaded && uploadedFile ? (
-                                      <span className="text-[11.5px] font-medium text-emerald-700 block truncate mt-0.5">
-                                        ✓ {uploadedFile.name} • {uploadedFile.size}
-                                      </span>
-                                    ) : isUploaded ? (
-                                      <span className="text-[11.5px] font-medium text-emerald-700 block truncate mt-0.5">
-                                        ✓ Document verified and ready
-                                      </span>
-                                    ) : (
-                                      <span className="text-[11.5px] text-slate-400 block truncate mt-0.5">
-                                        Accepted: PDF, PNG, JPG, JPEG (Max 10MB)
-                                      </span>
-                                    )}
+                                    <span className="text-[11.5px] text-slate-500 block truncate mt-0.5">
+                                      {currentStatus === 'YES' ? '✓ Marked as available' : currentStatus === 'NO' ? '✕ Not available yet' : 'Not sure / to be arranged'}
+                                    </span>
                                   </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
-                                  {/* Dynamic Status Badge */}
-                                  <span
-                                    className={`text-[11.5px] font-bold px-2.5 py-1 rounded-md border inline-flex items-center gap-1 ${
-                                      isUploaded
-                                        ? 'bg-emerald-100/70 text-emerald-800 border-emerald-300'
-                                        : 'bg-amber-50 text-amber-800 border-amber-200'
-                                    }`}
-                                  >
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isUploaded ? 'bg-emerald-600' : 'bg-amber-500'}`} />
-                                    {isUploaded ? 'Ready' : 'Pending'}
-                                  </span>
-
-                                  {/* Hidden File Input for Real Upload */}
-                                  <input
-                                    type="file"
-                                    id={`file_input_${doc.id}`}
-                                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        handleFileUpload(doc.id, file);
-                                      }
-                                    }}
-                                  />
-
-                                  {isUploaded ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <label
-                                        htmlFor={`file_input_${doc.id}`}
-                                        className="px-2.5 py-1 rounded-lg text-[11.5px] font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
-                                      >
-                                        Replace
-                                      </label>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveFile(doc.id)}
-                                        className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
-                                        title="Remove uploaded document"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <label
-                                      htmlFor={`file_input_${doc.id}`}
-                                      className="px-3 py-1.5 rounded-lg text-[12px] font-bold bg-[#2563EB] hover:bg-blue-700 text-white transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                <div className="flex items-center gap-1.5 self-end sm:self-center flex-shrink-0">
+                                  {[
+                                    { id: 'YES', label: 'Yes' },
+                                    { id: 'NO', label: 'No' },
+                                    { id: 'NOT_SURE', label: 'Not Sure' }
+                                  ].map((opt) => (
+                                    <button
+                                      key={opt.id}
+                                      type="button"
+                                      onClick={() => {
+                                        const currentStatuses = { ...(formData.documentStatuses || {}) };
+                                        currentStatuses[doc.id] = opt.id;
+                                        setFormData((prev) => ({
+                                          ...prev,
+                                          documentStatuses: currentStatuses
+                                        }));
+                                      }}
+                                      className={`px-3 py-1 rounded-lg text-[12px] font-bold border transition-all cursor-pointer ${
+                                        currentStatus === opt.id
+                                          ? opt.id === 'YES'
+                                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                                            : opt.id === 'NO'
+                                            ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                                            : 'bg-slate-700 border-slate-700 text-white shadow-xs'
+                                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                                      }`}
                                     >
-                                      <Upload className="w-3.5 h-3.5" />
-                                      <span>Upload</span>
-                                    </label>
-                                  )}
+                                      {opt.label}
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
                             );
@@ -2418,13 +2388,13 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
                         },
                         {
                           step: 4,
-                          title: 'Category & domicile',
+                          title: 'Category & state of residence',
                           desc: `${formData.category || 'General'}${formData.obcNclStatus === 'YES' ? ' (NCL)' : ''} • ${formData.domicileState || 'State'}`
                         },
                         {
                           step: 5,
                           title: 'Additional information',
-                          desc: `${formData.applicationType === 'RENEWAL' ? 'Renewal Applicant' : 'Fresh Applicant'} • ${dynamicDocuments.filter(d => (formData.documentStatuses?.[d.id] || (formData.uploadedDocumentIds || []).includes(d.id)) === 'READY').length} / ${dynamicDocuments.length} documents ready`
+                          desc: `${formData.applicationType === 'RENEWAL' ? 'Renewal Applicant' : 'Fresh Applicant'} • ${Object.values(formData.documentStatuses || {}).filter(s => s === 'YES' || s === 'READY').length} of ${dynamicDocuments.length} documents ready`
                         }
                       ].map((item) => (
                         <div

@@ -79,7 +79,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
           variants={itemVariants}
           className="mt-3 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
         >
-          Tell Scholar AI about yourself and discover verified Indian scholarships matched directly to your <strong className="text-white font-semibold">academic profile, family income, reservation category, course, and state domicile</strong>.
+          Tell Scholar AI about yourself and discover verified Indian scholarships matched directly to your <strong className="text-white font-semibold">academic profile, family income, reservation category, course, and state of residence</strong>.
         </motion.p>
 
         {/* Dominant Call To Action Bar with Magnetic hover */}
@@ -150,7 +150,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
             <span className="text-lg sm:text-xl font-black text-cyan-400">
               <CounterNumber value={28} suffix=" States & UTs" duration={1.8} />
             </span>
-            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">State Domicile Schemes</span>
+            <span className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">State Residence Schemes</span>
           </TiltCard>
 
           <TiltCard
@@ -173,7 +173,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
             <Landmark className="w-3.5 h-3.5 text-indigo-400" /> National Scholarship Portal (NSP)
           </span>
           <span className="flex items-center gap-1.5 hover:text-cyan-300 transition-colors">
-            <Building2 className="w-3.5 h-3.5 text-cyan-400" /> State Domicile Portals (MahaDBT, SSP)
+            <Building2 className="w-3.5 h-3.5 text-cyan-400" /> State Scholarship Portals (MahaDBT, SSP)
           </span>
           <span className="flex items-center gap-1.5 hover:text-emerald-300 transition-colors">
             <GraduationCap className="w-3.5 h-3.5 text-emerald-400" /> Corporate Philanthropy (Tata, Reliance)

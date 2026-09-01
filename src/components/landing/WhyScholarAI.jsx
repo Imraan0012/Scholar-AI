@@ -23,7 +23,7 @@ export default function WhyScholarAI() {
     {
       icon: Sparkles,
       title: "Tailored for Indian Education",
-      desc: "Full support for all State Boards, CBSE, ICSE, Domicile Quotas, Caste/Income categories, and central university schemes."
+      desc: "Full support for all State Boards, CBSE, ICSE, State Quotas, Caste/Income categories, and central university schemes."
     }
   ];
 

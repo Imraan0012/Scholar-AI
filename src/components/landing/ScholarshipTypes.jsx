@@ -18,11 +18,11 @@ export default function ScholarshipTypes({ onCheckEligibilityClick }) {
     {
       id: 'state',
       icon3d: '/icon_location.jpg',
-      title: '02. State Domicile Schemes',
+      title: '02. State Residence Schemes',
       subtitle: 'State Govt Departments (28 States & UTs)',
       desc: 'MahaDBT (MH), SSP (KA), e-Kalyan (JH/BR), OASIS (WB), Medhabruti (OD), and UP State Scholarship.',
       funding: '100% Tuition Fee Waiver',
-      tags: ['State Specific', 'OBC/SC/ST/EWS', 'Domicile Quota', 'College Renewal'],
+      tags: ['State Specific', 'OBC/SC/ST/EWS', 'State Quota', 'College Renewal'],
       badgeColor: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
     },
     {

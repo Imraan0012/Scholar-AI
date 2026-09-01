@@ -30,12 +30,12 @@ export function generateEligibilityExplanation(result = {}, studentProfile = {})
   if (isEligible) {
     const passedDetails = safeEvals.map(e => e?.details || e?.description || 'Requirement met');
     const docAdvice = safeMissingDocs.length > 0
-      ? `You qualify factually! Upload your ${safeMissingDocs.map(d => d.name || d.code || 'document').join(', ')} in the Document Vault to complete your application readiness.`
+      ? `You qualify factually! Ensure you have your ${safeMissingDocs.map(d => d.name || d.code || 'document').join(', ')} ready when applying on the official portal.`
       : 'All required document criteria are verified. Your profile is 100% application ready!';
 
     return {
       statusTitle: '100% Factually Qualified',
-      summary: `Your profile meets all critical eligibility criteria for ${schName}. Your annual family income (₹${Number(annualIncome).toLocaleString('en-IN')}), academic score, social category (${category}), and state domicile (${domicile}) align perfectly with scheme guidelines.`,
+      summary: `Your profile meets all critical eligibility criteria for ${schName}. Your annual family income (₹${Number(annualIncome).toLocaleString('en-IN')}), academic score, social category (${category}), and state of residence (${domicile}) align perfectly with scheme guidelines.`,
       passedPoints: passedDetails,
       actionableAdvice: docAdvice
     };

@@ -895,7 +895,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     >
                       <option value="ALL">All Sectors</option>
                       <option value="CENTRAL">Central Govt (NSP)</option>
-                      <option value="STATE">State Domicile</option>
+                      <option value="STATE">State Schemes</option>
                       <option value="PRIVATE">Corporate Trust</option>
                     </select>
 
@@ -1288,7 +1288,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-xs text-slate-400 block font-semibold">Domicile & Category</span>
+                    <span className="text-xs text-slate-400 block font-semibold">State of Residence & Category</span>
                     <span className="font-extrabold text-slate-900 block mt-1">
                       {profile.domicileState || 'Maharashtra'} • {profile.category || 'OBC'}
                     </span>
@@ -1358,7 +1358,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     <span className="font-bold text-slate-900 block mt-1">₹{(profile.annualIncome || 220000).toLocaleString('en-IN')} / year</span>
                   </div>
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-xs text-slate-400 block font-semibold">Category & Domicile</span>
+                    <span className="text-xs text-slate-400 block font-semibold">Category & State of Residence</span>
                     <span className="font-bold text-slate-900 block mt-1">{profile.category || 'OBC'} • {profile.domicileState || 'Maharashtra'}</span>
                   </div>
                 </div>
@@ -1467,7 +1467,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                     { id: 'doc_bonafide', name: 'College Bonafide / Enrollment Certificate', desc: 'Proof of active admission in current degree' },
                     { id: 'doc_income_cert', name: 'Annual Income Certificate', desc: 'Issued by Tehsildar / Sub-Divisional Magistrate' },
                     { id: 'doc_category_cert', name: 'Caste / Category Certificate (OBC/SC/ST/EWS)', desc: 'Official government reservation certificate' },
-                    { id: 'doc_domicile', name: 'State Domicile / Residence Proof', desc: 'Required for state-specific quota scholarships' },
+                    { id: 'doc_domicile', name: 'State Residence / Domicile Certificate', desc: 'Required for state-specific quota scholarships' },
                     { id: 'doc_special_proof', name: 'Disability / Minority / Special Proof', desc: 'Applicable for special category quota schemes' }
                   ].map((doc) => {
                     const uploaded = (profile.uploadedFiles || {})[doc.id];
@@ -2017,7 +2017,7 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                         >
                           <option value="ALL">All Sectors (Government & Corporate Trusts)</option>
                           <option value="CENTRAL">Central Govt (National Scholarship Portal)</option>
-                          <option value="STATE">State Domicile Schemes Only</option>
+                          <option value="STATE">State Schemes (Residence Based)</option>
                           <option value="PRIVATE">Corporate Philanthropic Trusts Only</option>
                         </select>
                         <p className="text-[11px] text-slate-500 mt-1">Highlight scholarships funded by your preferred sponsors.</p>
@@ -2590,8 +2590,8 @@ function ScholarshipCardRef({ data, isSaved, onToggleSave, onViewDetails, onAppl
                 : [
                     {
                       passed: Boolean(isEligible),
-                      description: isEligible ? 'Meets mandatory academic and domicile requirements' : (data?.failedCriteria?.[0] || 'Criteria verification required'),
-                      details: isEligible ? 'Academic score, income limit & domicile verified' : (data?.failedCriteria?.[0] || 'Criteria check')
+                      description: isEligible ? 'Meets mandatory academic and state residence requirements' : (data?.failedCriteria?.[0] || 'Criteria verification required'),
+                      details: isEligible ? 'Academic score, income limit & state of residence verified' : (data?.failedCriteria?.[0] || 'Criteria check')
                     }
                   ]
             ).slice(0, 3).map((ev, i) => (

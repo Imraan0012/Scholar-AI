@@ -438,7 +438,7 @@ export default function ScholarshipResultsView({ onGoToDashboard }) {
               >
                 <option value="ALL">All Sectors</option>
                 <option value="CENTRAL">Central Govt (NSP)</option>
-                <option value="STATE">State Domicile</option>
+                <option value="STATE">State Schemes</option>
                 <option value="PRIVATE">Corporate Trust</option>
               </select>
 
