@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StudentProfileProvider, useStudentProfile } from './context/StudentProfileContext';
+import { profileService } from './services/profileService';
 import AnimatedBackground from './components/ui/AnimatedBackground';
 import ScrollProgress from './components/ui/ScrollProgress';
 import PillNav from './components/ui/PillNav';
@@ -68,6 +69,7 @@ function MainAppContent() {
     // profileError: set when backend times out or fails
     profileError,
     retryProfile,
+    recalculateBackendEligibility,
     // backwards-compat alias (= authLoading)
     loading
   } = useStudentProfile();
@@ -180,7 +182,8 @@ function MainAppContent() {
 
       // If profile is loaded from database
       if (profileStatus === 'loaded') {
-        const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
+        const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+        const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
 
         if (isCompleted) {
           // If already completed and user lands on /onboarding (e.g. via direct URL or back button), redirect to /dashboard
@@ -204,7 +207,7 @@ function MainAppContent() {
         }
       }
     }
-  }, [view, currentUser, authLoading, profileStatus, profile?.onboardingComplete, profile?.isOnboarded]);
+  }, [view, currentUser, authLoading, profileStatus, profile?.onboardingComplete, profile?.isOnboarded, profile]);
 
   const handleOpenAuth = (mode = 'signin') => {
     setAuthMode(mode);
@@ -246,12 +249,61 @@ function MainAppContent() {
   };
 
   const handleStartCheckEligibility = async () => {
+    // 1. Unauthenticated users -> Prompt Login / Signup modal
+    if (authLoading) return;
     if (!currentUser) {
       handleOpenAuth('signup');
       return;
     }
-    const isCompleted = profileStatus === 'loaded' && Boolean(profile?.onboardingComplete || profile?.isOnboarded);
-    navigateToView(isCompleted ? 'dashboard' : 'onboarding');
+
+    // 2. While profile is loading from database/backend, inform user and await resolution
+    if (profileStatus === 'loading' || profileLoading) {
+      setUserNotification('Checking your saved profile...');
+      let attempts = 0;
+      while ((profileStatus === 'loading' || profileLoading) && attempts < 30) {
+        await new Promise((r) => setTimeout(r, 100));
+        attempts++;
+      }
+    }
+
+    // 3. Profile API Error -> Show error/retry, DO NOT navigate to onboarding
+    if (profileStatus === 'error') {
+      setUserNotification('Could not connect to profile service. Please click Retry.');
+      return;
+    }
+
+    // 4. If profile is loaded from database
+    if (profileStatus === 'loaded') {
+      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+
+      if (isCompleted) {
+        // Run/re-run eligibility matching against the latest scholarship catalog
+        try {
+          if (typeof recalculateBackendEligibility === 'function') {
+            await recalculateBackendEligibility();
+          }
+        } catch (e) {
+          console.warn('[EligibilityEntry] Recalculation notice:', e.message);
+        }
+        // Seamlessly route to analysis screen to display live matching animation and land on dashboard
+        navigateToView('analysis');
+        return;
+      } else {
+        // Incomplete profile - resume onboarding from incomplete step
+        navigateToView('onboarding');
+        return;
+      }
+    }
+
+    // 5. Brand new user with confirmed no profile in database
+    if (profileStatus === 'not_found') {
+      navigateToView('onboarding');
+      return;
+    }
+
+    // Fallback
+    navigateToView('onboarding');
   };
 
   const handleNavClick = (href) => {

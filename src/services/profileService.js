@@ -229,13 +229,11 @@ export const profileService = {
 
   /**
    * Saves onboarding step locally for instantaneous retrieval and initiates background sync.
+   * NOTE: We do NOT store sensitive profile data in localStorage; only step number is stored.
    */
   saveOnboardingProgress(stepNumber, stepData) {
     try {
       localStorage.setItem('scholar_ai_onboarding_step', String(stepNumber));
-      if (stepData) {
-        localStorage.setItem('scholar_ai_student_profile', JSON.stringify(stepData));
-      }
     } catch (e) {}
   },
 
@@ -245,7 +243,7 @@ export const profileService = {
    */
   getFirstIncompleteStep(p) {
     if (!p) return 1;
-    if (p.onboardingComplete === true || p.isOnboarded === true) {
+    if (p.onboardingComplete === true || p.isOnboarded === true || p.onboarding_complete === true) {
       return 6;
     }
 
@@ -273,23 +271,23 @@ export const profileService = {
     } else if (edu === 'DIPLOMA') {
       const hasCourse = Boolean((p.course && p.course.trim()) || (p.diplomaCourse && p.diplomaCourse.trim()));
       const hasBranch = Boolean((p.specialization && p.specialization.trim()) || (p.branch && p.branch.trim()));
-      const hasInst = Boolean(p.institutionName && p.institutionName.trim());
+      const hasInst = Boolean((p.institutionName && p.institutionName.trim()) || (p.universityName && p.universityName.trim()));
       const hasScore = hasNum(p.diplomaScore);
       if (!hasCourse || !hasBranch || !hasInst || !hasScore) return 2;
     } else if (edu === 'UNDERGRADUATE') {
       const hasCourse = Boolean(p.course && p.course.trim());
       const hasBranch = Boolean((p.specialization && p.specialization.trim()) || (p.branch && p.branch.trim()));
-      const hasInst = Boolean(p.institutionName && p.institutionName.trim());
-      const has12 = hasNum(p.class12Percentage);
-      const hasCgpa = hasNum(p.cgpa) || hasNum(p.currentCgpa);
+      const hasInst = Boolean((p.institutionName && p.institutionName.trim()) || (p.universityName && p.universityName.trim()));
+      const has12 = hasNum(p.class12Percentage) || hasNum(p.diplomaScore);
+      const hasCgpa = hasNum(p.cgpa) || hasNum(p.currentCgpa) || p.currentYear === 1 || p.currentYear === '1';
       if (!hasCourse || !hasBranch || !hasInst || !has12 || !hasCgpa) return 2;
     } else if (edu === 'POSTGRADUATE') {
       const hasCourse = Boolean(p.course && p.course.trim());
       const hasBranch = Boolean((p.specialization && p.specialization.trim()) || (p.branch && p.branch.trim()));
-      const hasInst = Boolean(p.institutionName && p.institutionName.trim());
+      const hasInst = Boolean((p.institutionName && p.institutionName.trim()) || (p.universityName && p.universityName.trim()));
       const hasUg = Boolean((p.undergraduateDegree && p.undergraduateDegree.trim()) || (p.ugDegree && p.ugDegree.trim()));
       const hasUgCgpa = hasNum(p.undergraduateCgpa) || hasNum(p.ugCgpa);
-      const hasCgpa = hasNum(p.cgpa) || hasNum(p.currentCgpa);
+      const hasCgpa = hasNum(p.cgpa) || hasNum(p.currentCgpa) || p.currentYear === 1 || p.currentYear === '1';
       if (!hasCourse || !hasBranch || !hasInst || !hasUg || !hasUgCgpa || !hasCgpa) return 2;
     }
 
@@ -299,14 +297,14 @@ export const profileService = {
     const hasSource = has(p.incomeSource);
     const memberCount = p.familyMembersCount !== undefined ? p.familyMembersCount : p.familyMemberCount;
     const hasMembers = memberCount !== undefined && memberCount !== null && parseInt(memberCount, 10) >= 1;
-    const hasCert = has(p.incomeCertificateStatus);
+    const hasCert = has(p.incomeCertificateStatus) || p.hasIncomeCertificate !== undefined;
     if (!hasIncome || !hasSource || !hasMembers || !hasCert) {
       return 3;
     }
 
     // --- STEP 4: Category & Domicile ---
     const hasCategory = has(p.category);
-    const hasDomicile = has(p.domicileState) || has(p.state);
+    const hasDomicile = has(p.domicileState) || has(p.state) || has(p.currentResidenceState);
     if (!hasCategory || !hasDomicile) {
       return 4;
     }

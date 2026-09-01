@@ -92,12 +92,24 @@ function formatIncomeInWords(amount) {
 }
 
 export default function OnboardingWizard({ onComplete, onCancel }) {
-  const { profile, updateProfile } = useStudentProfile();
+  const { profile, updateProfile, profileStatus } = useStudentProfile();
 
   const [currentStep, setCurrentStep] = useState(() => {
     const firstIncomplete = profileService.getFirstIncompleteStep(profile);
     return (firstIncomplete >= 1 && firstIncomplete <= 5) ? firstIncomplete : 1;
   });
+
+  // Guard: If an already-completed user enters OnboardingWizard, automatically redirect them to analysis/dashboard
+  useEffect(() => {
+    if (profileStatus === 'loaded') {
+      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+      const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+      if (isCompleted) {
+        console.log('[OnboardingWizard] User profile is already complete -> redirecting to analysis');
+        onComplete?.(profile);
+      }
+    }
+  }, [profile, profileStatus, onComplete]);
 
   const [formData, setFormData] = useState(() => ({
     ...profile,
@@ -127,7 +139,11 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
 
   // Synchronize server-loaded profile fields into form state on initial load
   useEffect(() => {
-    if (profile) {
+    if (profile && profileStatus === 'loaded') {
+      const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+      if (firstIncomplete >= 1 && firstIncomplete <= 5) {
+        setCurrentStep(firstIncomplete);
+      }
       setFormData((prev) => {
         const next = { ...prev };
         Object.keys(profile).forEach((key) => {
@@ -138,7 +154,7 @@ export default function OnboardingWizard({ onComplete, onCancel }) {
         return next;
       });
     }
-  }, [profile?.id]);
+  }, [profile, profileStatus]);
 
   const handleChange = (field, value) => {
     setSaveError(null);
