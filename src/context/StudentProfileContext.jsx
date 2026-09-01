@@ -153,12 +153,12 @@ export const StudentProfileProvider = ({ children }) => {
   // authLoading: true only while Supabase resolves the session (~200 ms).
   //   The full-screen loader in App.jsx is gated on this.
   const [authLoading, setAuthLoading] = useState(true);
-  // profileLoading: true while Spring Boot /api/profile is in-flight.
+  // profileLoading: true while Spring Boot /api/profile or Supabase is in-flight.
   //   Never blocks the whole app — only shows skeletons inside profile sections.
   const [profileLoading, setProfileLoading] = useState(false);
-  // profileStatus: 'loading' | 'loaded' | 'not_found' | 'error'
+  // profileStatus: 'unauthenticated' | 'loading' | 'loaded' | 'not_found' | 'error'
   //   Guarantees route guards ONLY redirect on confirmed 'not_found' in DB.
-  const [profileStatus, setProfileStatus] = useState('loading');
+  const [profileStatus, setProfileStatus] = useState('unauthenticated');
   // profileError: message string when backend failed/timed out; null otherwise.
   const [profileError, setProfileError] = useState(null);
 
@@ -181,7 +181,8 @@ export const StudentProfileProvider = ({ children }) => {
   const loadUserData = useCallback(async (user, { isRetry = false } = {}) => {
     if (!user?.id) {
       setProfile(createEmptyProfile(null));
-      setProfileStatus('not_found');
+      setProfileStatus('unauthenticated');
+      setProfileLoading(false);
       setBookmarks([]);
       setSavedApplications([]);
       setNotifications([]);
@@ -189,15 +190,14 @@ export const StudentProfileProvider = ({ children }) => {
     }
 
     setProfileLoading(true);
-    setProfileStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
+    setProfileStatus('loading');
     if (!isRetry) setProfileError(null);
 
     try {
-      // Profile fetch — can time-out (AbortController in apiClient).
-      // Bookmarks / apps / notifs are lightweight Supabase calls, run in parallel.
+      // Profile fetch — tries Spring Boot API first, falls back directly to Supabase on cold start.
+      // Bookmarks / apps / notifs run in parallel.
       const [userProfile, userBookmarks, userApps, userNotifs] = await Promise.all([
         profileService.getProfile(user.id).catch((err) => {
-          // Re-throw so we can handle 404 vs timeout / network errors below
           throw err;
         }),
         bookmarkService.getBookmarks(user.id).catch(() => []),
@@ -206,51 +206,47 @@ export const StudentProfileProvider = ({ children }) => {
       ]);
 
       const empty = createEmptyProfile(user);
-      const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
-      const isCompleted = firstIncomplete === 6 || Boolean(userProfile?.onboardingComplete || userProfile?.isOnboarded);
-      const step = isCompleted ? 6 : firstIncomplete;
 
-      const hasValidProfile = Boolean(
-        userProfile &&
-        (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course)
-      );
+      if (userProfile && (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course || userProfile.onboardingComplete)) {
+        const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
+        const isCompleted = Boolean(userProfile.onboardingComplete || userProfile.isOnboarded) || firstIncomplete === 6;
+        const step = isCompleted ? 6 : firstIncomplete;
 
-      const cleanProfile = {
-        ...empty,
-        ...(userProfile || {}),
-        isOnboarded: isCompleted,
-        onboardingComplete: isCompleted,
-        onboardingStep: step
-      };
+        const cleanProfile = {
+          ...empty,
+          ...userProfile,
+          isOnboarded: isCompleted,
+          onboardingComplete: isCompleted,
+          onboardingStep: isCompleted ? 5 : Math.min(5, Math.max(1, step))
+        };
 
-      setProfile(cleanProfile);
-      setProfileStatus(hasValidProfile ? 'loaded' : 'not_found');
-      setProfileError(null);
+        setProfile(cleanProfile);
+        setProfileStatus('loaded');
+        setProfileError(null);
 
-      // Cache only harmless hint — never the full profile data
-      writeProfileHint(hasValidProfile, isCompleted);
-      try {
-        localStorage.setItem('scholar_ai_onboarding_step', String(step));
-      } catch (e) {}
+        writeProfileHint(true, isCompleted);
+        try {
+          localStorage.setItem('scholar_ai_onboarding_step', String(step));
+        } catch (e) {}
+      } else {
+        // Profile confirmed absent in database
+        setProfile(empty);
+        setProfileStatus('not_found');
+        setProfileError(null);
+        writeProfileHint(false, false);
+      }
 
       setBookmarks(Array.isArray(userBookmarks) ? userBookmarks : []);
       setSavedApplications(Array.isArray(userApps) ? userApps : []);
       setNotifications(Array.isArray(userNotifs) ? userNotifs : []);
     } catch (err) {
-      const isTimeout = err?.isTimeout === true;
-      const is404 = err?.status === 404 || err?.message?.toLowerCase().includes('not found');
-
-      if (is404) {
-        setProfileStatus('not_found');
-        setProfileError(null);
-      } else {
-        // Backend timeout, Render sleep, or network disconnection
-        setProfileStatus('error');
-        const msg = isTimeout
-          ? 'Server is waking up — this may take a moment.'
-          : 'Could not load your profile. Check your connection.';
-        setProfileError(msg);
-      }
+      // DO NOT mark not_found on error or timeout!
+      setProfileStatus('error');
+      const isTimeout = err?.isTimeout === true || err?.status === 408;
+      const msg = isTimeout
+        ? 'Server is waking up — click Retry in a moment.'
+        : 'Could not connect to profile service. Click Retry.';
+      setProfileError(msg);
 
       console.warn('[StudentProfileContext] loadUserData notice:', err.message);
       // Do NOT sign the user out or clear their session on profile failure.
@@ -290,10 +286,11 @@ export const StudentProfileProvider = ({ children }) => {
 
       if (user) {
         setCurrentUser(user);
+        setProfileStatus('loading');
       } else {
         setCurrentUser(null);
         setProfile(createEmptyProfile(null));
-        setProfileStatus('not_found');
+        setProfileStatus('unauthenticated');
         setBookmarks([]);
         setSavedApplications([]);
         setNotifications([]);
@@ -303,12 +300,8 @@ export const StudentProfileProvider = ({ children }) => {
       setAuthLoading(false);
 
       // ── Phase 3: Non-blocking background fetches ─────────────────────────────
-      // IMPORTANT: Only fetch backend data when the user is authenticated.
-      // Public routes (/, /signup, /login) must never contact the Render backend.
       if (user) {
-        // loadUserData manages its own profileLoading / profileStatus / profileError state
         loadUserData(user);
-        // Scholarships: load async for authenticated users only
         loadScholarshipsAsync();
       }
     }
@@ -322,19 +315,22 @@ export const StudentProfileProvider = ({ children }) => {
       // INITIAL_SESSION is handled by initSession — ignore to prevent duplicate fetch
       if (event === 'INITIAL_SESSION') return;
 
-      // TOKEN_REFRESHED or USER_UPDATED: keep existing profile intact, do NOT reset status
+      // TOKEN_REFRESHED: keep existing profile intact, do NOT reset status
       if (event === 'TOKEN_REFRESHED') {
         if (user) setCurrentUser(user);
         return;
       }
 
-      if (user) {
-        setCurrentUser(user);
-        loadUserData(user);
-      } else {
+      if (event === 'SIGNED_IN' || (event === 'USER_UPDATED' && user)) {
+        if (user) {
+          setCurrentUser(user);
+          setProfileStatus('loading');
+          loadUserData(user);
+        }
+      } else if (event === 'SIGNED_OUT' || !user) {
         setCurrentUser(null);
         setProfile(createEmptyProfile(null));
-        setProfileStatus('not_found');
+        setProfileStatus('unauthenticated');
         setBookmarks([]);
         setSavedApplications([]);
         setNotifications([]);
@@ -463,8 +459,8 @@ export const StudentProfileProvider = ({ children }) => {
     const res = await authService.signIn({ email, password });
     if (res.success && res.user) {
       setCurrentUser(res.user);
-      // Profile will be loaded by the onAuthStateChange listener or can be
-      // triggered explicitly here for immediate feedback.
+      setProfileStatus('loading');
+      setProfileLoading(true);
       loadUserData(res.user);
     }
     return res;
@@ -474,6 +470,7 @@ export const StudentProfileProvider = ({ children }) => {
     const res = await authService.signUp({ email, password, fullName });
     if (res.success && res.user && res.session) {
       setCurrentUser(res.user);
+      setProfileStatus('not_found');
       const empty = createEmptyProfile(res.user);
       const cleanProfile = {
         ...empty,
@@ -485,7 +482,7 @@ export const StudentProfileProvider = ({ children }) => {
         onboardingStep: 1
       };
       setProfile(cleanProfile);
-      writeProfileHint(true, false);
+      writeProfileHint(false, false);
     }
     return res;
   };
@@ -498,6 +495,7 @@ export const StudentProfileProvider = ({ children }) => {
     } finally {
       setCurrentUser(null);
       setProfile(createEmptyProfile(null));
+      setProfileStatus('unauthenticated');
       setBookmarks([]);
       setSavedApplications([]);
       setNotifications([]);

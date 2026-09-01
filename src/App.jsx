@@ -139,7 +139,7 @@ function MainAppContent() {
   }, []);
 
   // Route protection & Centralized Onboarding Guard.
-  // Strictly redirect to onboarding ONLY when profileStatus === 'not_found'.
+  // Strictly redirect to onboarding ONLY when profileStatus === 'not_found' or onboarding is incomplete.
   // Do NOT redirect during loading, error, Render cold-start, token refresh, or realtime disconnection.
   useEffect(() => {
     // Wait until auth resolves before making routing decisions
@@ -158,18 +158,53 @@ function MainAppContent() {
       return;
     }
 
-    // 2. Only redirect to onboarding when profile is confirmed not found in database.
-    if (currentUser && profileStatus === 'not_found') {
-      const requiresCompletedOnboarding = ['dashboard', 'results', 'analysis'].includes(view);
-      if (requiresCompletedOnboarding) {
-        console.log('[OnboardingGuard] Profile not found in database for', view, '-> Redirecting to /onboarding');
-        setView('onboarding');
-        if (window.location.pathname !== '/onboarding') {
-          window.history.replaceState(null, '', '/onboarding');
+    // 2. Authenticated routing checks
+    if (currentUser) {
+      // While profile is loading or in connection error state, do NOT redirect
+      if (profileStatus === 'loading' || profileStatus === 'error' || profileStatus === 'unauthenticated') {
+        return;
+      }
+
+      // If profile is confirmed absent from database (brand new account)
+      if (profileStatus === 'not_found') {
+        const requiresCompletedOnboarding = ['dashboard', 'results', 'analysis'].includes(view);
+        if (requiresCompletedOnboarding) {
+          console.log('[OnboardingGuard] Profile not found in database for', view, '-> Redirecting to /onboarding');
+          setView('onboarding');
+          if (window.location.pathname !== '/onboarding') {
+            window.history.replaceState(null, '', '/onboarding');
+          }
+        }
+        return;
+      }
+
+      // If profile is loaded from database
+      if (profileStatus === 'loaded') {
+        const isCompleted = Boolean(profile?.onboardingComplete || profile?.isOnboarded);
+
+        if (isCompleted) {
+          // If already completed and user lands on /onboarding (e.g. via direct URL or back button), redirect to /dashboard
+          if (view === 'onboarding') {
+            console.log('[OnboardingGuard] User already completed onboarding -> Redirecting to /dashboard');
+            setView('dashboard');
+            if (window.location.pathname !== '/dashboard') {
+              window.history.replaceState(null, '', '/dashboard');
+            }
+          }
+        } else {
+          // If incomplete, require completion before accessing dashboard / analysis / results
+          const requiresCompletedOnboarding = ['dashboard', 'results', 'analysis'].includes(view);
+          if (requiresCompletedOnboarding) {
+            console.log('[OnboardingGuard] Incomplete profile for', view, '-> Redirecting to /onboarding');
+            setView('onboarding');
+            if (window.location.pathname !== '/onboarding') {
+              window.history.replaceState(null, '', '/onboarding');
+            }
+          }
         }
       }
     }
-  }, [view, currentUser, authLoading, profileStatus]);
+  }, [view, currentUser, authLoading, profileStatus, profile?.onboardingComplete, profile?.isOnboarded]);
 
   const handleOpenAuth = (mode = 'signin') => {
     setAuthMode(mode);
@@ -194,14 +229,14 @@ function MainAppContent() {
       setUserNotification(null);
     }, 3000);
 
-    // SIGN UP FLOW: A newly registered user MUST ALWAYS go to onboarding step 1
+    // SIGN UP FLOW: A newly registered user goes to onboarding step 1
     if (authMode === 'signup') {
       navigateToView('onboarding');
       return;
     }
 
     // SIGN IN FLOW: Navigate immediately to dashboard.
-    // The onboarding guard will only redirect if database confirms profile is not_found.
+    // The onboarding guard will only redirect if database confirms profile is not_found or incomplete.
     navigateToView('dashboard');
   };
 
@@ -215,7 +250,8 @@ function MainAppContent() {
       handleOpenAuth('signup');
       return;
     }
-    navigateToView(profileStatus === 'not_found' ? 'onboarding' : 'dashboard');
+    const isCompleted = profileStatus === 'loaded' && Boolean(profile?.onboardingComplete || profile?.isOnboarded);
+    navigateToView(isCompleted ? 'dashboard' : 'onboarding');
   };
 
   const handleNavClick = (href) => {
