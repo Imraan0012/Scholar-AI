@@ -405,7 +405,7 @@ function MainAppContent() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center"
+              className="w-full"
             >
               <HeroSection
                 currentUser={currentUser}
