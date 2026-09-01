@@ -46,6 +46,7 @@ export default function ScholarshipTypes({ onCheckEligibilityClick }) {
           const targetUrl = getTargetUrl(item);
           const deadlineInfo = getScholarshipDeadlineDisplay(item);
           const isClosed = deadlineInfo.isClosed;
+          const isUnverified = deadlineInfo.status === 'AVAILABILITY_UNVERIFIED' || item.status === 'AVAILABILITY_UNVERIFIED';
 
           return (
             <div
