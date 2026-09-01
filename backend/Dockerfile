@@ -33,8 +33,11 @@ RUN chown -R scholarai:scholarai /app
 USER scholarai
 
 # Default environment port (Render overrides this at runtime via $PORT)
-ENV PORT=8000
-EXPOSE 8000
+ENV PORT=8080
+EXPOSE 8080
 
-# Execute Spring Boot application
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+# JVM container memory optimization for 512MB RAM environments
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom"
+
+# Execute Spring Boot application with proper signal propagation
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
