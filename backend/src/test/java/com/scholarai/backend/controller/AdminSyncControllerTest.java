@@ -41,6 +41,7 @@ class AdminSyncControllerTest {
         candidateRepository = mock(ScholarshipDiscoveryCandidateRepository.class);
         sourceRepository = mock(ScholarshipSourceRepository.class);
         com.scholarai.backend.repository.ScholarshipScanRunRepository scanRunRepo = mock(com.scholarai.backend.repository.ScholarshipScanRunRepository.class);
+        when(scanRunRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         ObjectMapper objectMapper = new ObjectMapper();
 
         syncService = new ScholarshipSyncService(scholarshipRepository, reviewRepository, objectMapper);
@@ -190,6 +191,72 @@ class AdminSyncControllerTest {
 
         ResponseEntity<ApiResponse<Map<String, Object>>> response =
                 controller.publishSafeCandidates(CONFIGURED_SECRET, "ADMIN_REVIEWER");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(true, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testMasterPipelineRunMissingSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.runMasterPipeline(null, "TEST_TRIGGER");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testMasterPipelineRunWrongSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.runMasterPipeline("wrong-token-value", "TEST_TRIGGER");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testMasterPipelineRunCorrectSecretSucceeds() {
+        when(scholarshipRepository.findAll()).thenReturn(Collections.emptyList());
+
+        ResponseEntity<ApiResponse<Map<String, Object>>> response =
+                controller.runMasterPipeline(CONFIGURED_SECRET, "TEST_TRIGGER");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(true, response.getBody().isSuccess());
+        assertEquals("Master 12-hour pipeline completed successfully", response.getBody().getMessage());
+    }
+
+    @Test
+    void testGetScanRunsMissingSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<List<com.scholarai.backend.entity.ScholarshipScanRun>>> response =
+                controller.getScanRuns(null);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testGetScanRunsCorrectSecretSucceeds() {
+        ResponseEntity<ApiResponse<List<com.scholarai.backend.entity.ScholarshipScanRun>>> response =
+                controller.getScanRuns(CONFIGURED_SECRET);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(true, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testGetLatestScanRunMissingSecretReturnsForbidden() {
+        ResponseEntity<ApiResponse<com.scholarai.backend.entity.ScholarshipScanRun>> response =
+                controller.getLatestScanRun(null);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(false, response.getBody().isSuccess());
+    }
+
+    @Test
+    void testGetLatestScanRunCorrectSecretSucceeds() {
+        ResponseEntity<ApiResponse<com.scholarai.backend.entity.ScholarshipScanRun>> response =
+                controller.getLatestScanRun(CONFIGURED_SECRET);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(true, response.getBody().isSuccess());

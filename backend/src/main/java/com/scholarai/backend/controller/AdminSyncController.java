@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping({"/api/admin/sync", "/api/admin/discovery"})
+@RequestMapping("/api/admin")
 public class AdminSyncController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminSyncController.class);
@@ -63,7 +63,7 @@ public class AdminSyncController {
     /**
      * Secured 12-hour scheduler sync endpoint triggered by GitHub Actions or admin tasks.
      */
-    @PostMapping({"/scholarships", "/sync/scholarships"})
+    @PostMapping({"/sync/scholarships", "/scholarships", "/sync"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> runScholarshipSync(
             @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret,
             @RequestBody(required = false) List<Map<String, Object>> incomingRecords) {
@@ -82,7 +82,7 @@ public class AdminSyncController {
     /**
      * Triggers the All-India Discovery pipeline across all registered official source connectors.
      */
-    @PostMapping({"/run", "/discovery/run"})
+    @PostMapping({"/discovery/run", "/discovery/all-india", "/run"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> runDiscovery(
             @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret) {
 
@@ -150,7 +150,7 @@ public class AdminSyncController {
     /**
      * Batch-publishes all verified SAFE_NEW pending candidates while rejecting duplicates.
      */
-    @PostMapping({"/publish-safe", "/discovery/publish-safe"})
+    @PostMapping({"/publish-safe", "/discovery/publish-safe", "/sync/publish-safe"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> publishSafeCandidates(
             @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret,
             @RequestParam(defaultValue = "ADMIN_REVIEWER") String reviewer) {
@@ -239,7 +239,7 @@ public class AdminSyncController {
      * Executes the comprehensive 12-hour master automated discovery, deadline tracking,
      * deduplication, and auto-publication pipeline.
      */
-    @PostMapping({"/pipeline/run", "/scan/run", "/discovery/master-run"})
+    @PostMapping({"/pipeline/run", "/scan/run", "/discovery/master-run", "/sync/pipeline/run", "/discovery/pipeline/run"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> runMasterPipeline(
             @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret,
             @RequestParam(defaultValue = "12_HOUR_SCHEDULER") String triggeredBy) {
@@ -256,7 +256,7 @@ public class AdminSyncController {
     /**
      * Lists recent scan run histories.
      */
-    @GetMapping({"/pipeline/runs", "/scan/runs"})
+    @GetMapping({"/pipeline/runs", "/scan/runs", "/sync/pipeline/runs", "/discovery/pipeline/runs"})
     public ResponseEntity<ApiResponse<List<com.scholarai.backend.entity.ScholarshipScanRun>>> getScanRuns(
             @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret) {
 
@@ -271,7 +271,7 @@ public class AdminSyncController {
     /**
      * Returns the latest master scan run summary.
      */
-    @GetMapping({"/pipeline/latest", "/scan/latest"})
+    @GetMapping({"/pipeline/latest", "/scan/latest", "/sync/pipeline/latest", "/discovery/pipeline/latest"})
     public ResponseEntity<ApiResponse<com.scholarai.backend.entity.ScholarshipScanRun>> getLatestScanRun(
             @RequestHeader(value = "X-Scheduler-Secret", required = false) String headerSecret) {
 

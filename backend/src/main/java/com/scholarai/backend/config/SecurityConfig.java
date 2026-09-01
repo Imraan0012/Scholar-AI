@@ -49,8 +49,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/scholarships/**", "/scholarships/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/sources/**", "/sources/**").permitAll()
 
-                        // Sync & Discovery Scheduler Endpoints (Protected via X-Scheduler-Secret header)
-                        .requestMatchers("/api/admin/sync/**", "/api/admin/discovery/**").permitAll()
+                        // Sync, Discovery & Master Pipeline Scheduler Endpoints (Protected via X-Scheduler-Secret header)
+                        .requestMatchers(
+                                "/api/admin/sync/**",
+                                "/api/admin/discovery/**",
+                                "/api/admin/pipeline/**",
+                                "/api/admin/scan/**"
+                        ).permitAll()
 
                         // Other Admin Endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

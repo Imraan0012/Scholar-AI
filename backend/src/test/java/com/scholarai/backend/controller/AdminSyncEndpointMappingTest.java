@@ -55,4 +55,58 @@ class AdminSyncEndpointMappingTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    void testMasterPipelineRunEndpointWithValidSecret() throws Exception {
+        mockMvc.perform(post("/api/admin/pipeline/run")
+                        .header("X-Scheduler-Secret", VALID_SCHEDULER_SECRET)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Master 12-hour pipeline completed successfully"));
+    }
+
+    @Test
+    void testMasterPipelineRunEndpointWithInvalidSecret() throws Exception {
+        mockMvc.perform(post("/api/admin/pipeline/run")
+                        .header("X-Scheduler-Secret", "wrong-secret-token")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testMasterPipelineRunEndpointWithMissingSecret() throws Exception {
+        mockMvc.perform(post("/api/admin/pipeline/run")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testMasterPipelineGetRunsWithValidSecret() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/admin/pipeline/runs")
+                        .header("X-Scheduler-Secret", VALID_SCHEDULER_SECRET)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testMasterPipelineGetLatestWithValidSecret() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/admin/pipeline/latest")
+                        .header("X-Scheduler-Secret", VALID_SCHEDULER_SECRET)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void testDiscoveryRunEndpointWithValidSecret() throws Exception {
+        mockMvc.perform(post("/api/admin/discovery/run")
+                        .header("X-Scheduler-Secret", VALID_SCHEDULER_SECRET)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
 }
