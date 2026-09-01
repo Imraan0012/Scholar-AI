@@ -585,6 +585,7 @@ export const StudentProfileProvider = ({ children }) => {
       value={{
         currentUser,
         profile,
+        evaluationResults,
         onboardingCompleted: Boolean(profile?.onboardingComplete === true || profile?.isOnboarded === true),
         onboardingStep: profile?.onboardingStep || 1,
         scholarships,
