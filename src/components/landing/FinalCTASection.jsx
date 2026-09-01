@@ -1,10 +1,26 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, ArrowRight, CheckCircle2, ShieldCheck, Landmark } from 'lucide-react';
-import { HoverBorderGradient } from '../ui/HoverBorderGradient';
-import MagneticButton from '../ui/MagneticButton';
+import { ArrowRight, CheckCircle2, ShieldCheck, Landmark } from 'lucide-react';
+import { useStudentProfile } from '../../context/StudentProfileContext';
+import { profileService } from '../../services/profileService';
 
 export default function FinalCTASection({ onCheckEligibilityClick }) {
+  const { currentUser, profile } = useStudentProfile();
+  const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+  const isProfileComplete = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+
+  const titleText = !currentUser
+    ? 'Find scholarships that match you.'
+    : isProfileComplete
+    ? "See what's available for you now."
+    : 'Complete your profile to unlock matches.';
+
+  const buttonText = !currentUser
+    ? 'Check My Eligibility'
+    : isProfileComplete
+    ? 'View My Matches'
+    : 'Complete My Profile';
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 30 }}
@@ -13,58 +29,34 @@ export default function FinalCTASection({ onCheckEligibilityClick }) {
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className="py-14 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto relative z-10 text-center"
     >
-      <div className="relative rounded-2xl p-8 sm:p-12 overflow-hidden border border-white/15 bg-gradient-to-b from-[#111424] to-[#0a0b12] shadow-2xl backdrop-blur-xl">
-        {/* Animated Glow orb inside CTA card */}
-        <motion.div
-          animate={{
-            scale: [1, 1.15, 1],
-            opacity: [0.2, 0.35, 0.2]
-          }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: 'easeInOut'
-          }}
-          className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-indigo-600/20 blur-[90px] pointer-events-none"
-        />
-
-        <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 inline-block mb-3">
-          100% Free For All Indian Students
-        </span>
-
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight max-w-2xl mx-auto leading-tight">
-          Stop Searching. <br className="hidden sm:inline" />
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-cyan-200 to-emerald-300">
-            Start Matching.
-          </span>
+      <div className="relative rounded-3xl p-8 sm:p-12 overflow-hidden border border-white/15 bg-gradient-to-b from-[#111424] to-[#0a0b12] shadow-2xl backdrop-blur-xl">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight max-w-2xl mx-auto leading-tight">
+          {titleText}
         </h2>
 
-        <p className="text-gray-300 mt-3.5 text-xs sm:text-sm max-w-lg mx-auto font-normal leading-relaxed drop-shadow-md">
-          Let Scholar AI find the scholarships you're actually eligible for across Central, State, and Corporate funds.
+        <p className="text-gray-300 mt-3 text-xs sm:text-sm max-w-lg mx-auto font-normal leading-relaxed">
+          Discover verified Indian scholarships matched to your education, income, category and State of Residence.
         </p>
 
-        <div className="mt-7 flex justify-center">
-          <MagneticButton strength={0.25} onClick={onCheckEligibilityClick}>
-            <HoverBorderGradient
-              containerClassName="rounded-full shadow-2xl shadow-indigo-500/30"
-              className="bg-[#0b0d16] text-white font-bold text-xs sm:text-sm px-7 py-3 flex items-center gap-2.5 group cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4 text-cyan-400 group-hover:rotate-12 transition-transform duration-300" />
-              <span>Check My Eligibility</span>
-              <ArrowRight className="w-4 h-4 text-indigo-300 group-hover:translate-x-1.5 transition-transform duration-300" />
-            </HoverBorderGradient>
-          </MagneticButton>
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={onCheckEligibilityClick}
+            className="px-7 py-3 rounded-full bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-600 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm shadow-xl shadow-indigo-500/20 inline-flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            <span>{buttonText}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-gray-300 font-medium">
-          <span className="flex items-center gap-1.5 hover:text-white transition-colors">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Instant profile verification
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-6 text-xs text-gray-300 font-medium pt-4 border-t border-white/5">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Accurate criteria matching
           </span>
-          <span className="flex items-center gap-1.5 hover:text-white transition-colors">
-            <Landmark className="w-4 h-4 text-cyan-400" /> Direct official portal links
+          <span className="flex items-center gap-1.5">
+            <Landmark className="w-3.5 h-3.5 text-cyan-400" /> Direct official portal links
           </span>
-          <span className="flex items-center gap-1.5 hover:text-white transition-colors">
-            <ShieldCheck className="w-4 h-4 text-indigo-400" /> Zero fake or expired listings
+          <span className="flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> 100% free for students
           </span>
         </div>
       </div>

@@ -8,18 +8,21 @@ import CounterNumber from '../ui/CounterNumber';
 import MagneticButton from '../ui/MagneticButton';
 
 import { useStudentProfile } from '../../context/StudentProfileContext';
+import { profileService } from '../../services/profileService';
 import MetricCard from '../ui/MetricCard';
 
 export default function HeroSection({ currentUser, onCheckEligibilityClick, onAuthClick }) {
-  const { scholarships } = useStudentProfile();
+  const { profile, scholarships } = useStudentProfile();
   const liveCatalogCount = (scholarships && scholarships.length > 0) ? scholarships.length : 63;
 
-  const eligibleWords = [
-    "You're Actually Eligible For",
-    "Across Verified Indian Grants",
-    "Matched To Your Income & State",
-    "Tailored To Your Social Category"
-  ];
+  const firstIncomplete = profileService.getFirstIncompleteStep(profile);
+  const isProfileComplete = Boolean(profile?.onboardingComplete || profile?.isOnboarded) || firstIncomplete === 6;
+
+  const ctaText = !currentUser
+    ? 'Check My Eligibility'
+    : isProfileComplete
+    ? 'View My Matches'
+    : 'Complete My Profile';
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -61,31 +64,28 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         >
           <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
           <span className="text-emerald-400 font-bold tracking-tight">
-            100% Verified
+            Official Sources
           </span>
-          <span className="text-gray-300">Central, State & Corporate Schemes</span>
+          <span className="text-gray-300">Verified Central & State Scholarships</span>
         </motion.div>
 
-        {/* Main Headline with FlipWords */}
+        {/* Main Headline */}
         <motion.h1
           variants={itemVariants}
-          className="text-2xl sm:text-3xl md:text-4xl lg:text-[46px] font-extrabold text-center tracking-tight text-white max-w-3xl leading-[1.15]"
+          className="text-2xl sm:text-3xl md:text-4xl lg:text-[44px] font-extrabold text-center tracking-tight text-white max-w-3xl leading-[1.15]"
         >
-          Find Scholarships <br className="hidden sm:inline" />
-          <FlipWords
-            text="You're Actually Eligible For"
-            words={eligibleWords}
-            duration={3000}
-            className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-cyan-200 to-indigo-300 font-black"
-          />
+          Find scholarships you're <br className="hidden sm:inline" />
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-cyan-200 to-indigo-300">
+            actually eligible for.
+          </span>
         </motion.h1>
 
         {/* Clear Domain-Specific Supporting Text */}
         <motion.p
           variants={itemVariants}
-          className="mt-3 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
+          className="mt-3.5 text-xs sm:text-sm text-gray-300 text-center max-w-xl font-normal leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
         >
-          Tell Scholar AI about yourself and discover verified Indian scholarships matched directly to your <strong className="text-white font-semibold">academic profile, family income, reservation category, course, and state of residence</strong>.
+          Tell us about your education, family income, category and State of Residence. Scholar AI checks scholarship requirements and shows the schemes that match your profile.
         </motion.p>
 
         {/* Dominant Call To Action Bar with Magnetic hover */}
@@ -100,7 +100,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
               className="bg-gradient-to-r from-indigo-950 via-slate-900 to-zinc-950 text-white font-bold text-xs sm:text-sm px-6 py-2.5 flex items-center gap-2 group cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform duration-300" />
-              <span>Check My Eligibility</span>
+              <span>{ctaText}</span>
               <ArrowRight className="w-3.5 h-3.5 text-indigo-300 group-hover:translate-x-1.5 transition-transform duration-300" />
             </HoverBorderGradient>
           </MagneticButton>
@@ -119,7 +119,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
             href="#how-it-works"
             className="text-xs sm:text-sm font-semibold text-gray-300 hover:text-white px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all hover:scale-105 active:scale-95 flex items-center gap-1"
           >
-            <span>Explore How It Works</span>
+            <span>How It Works</span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
           </a>
         </motion.div>
@@ -134,9 +134,9 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
               theme="dark"
               size="default"
               className="h-full"
-              value={<CounterNumber value={liveCatalogCount} suffix="+" duration={2} />}
-              label="Verified Active"
-              subtitle="Scholarships Indexed"
+              value={<CounterNumber value={liveCatalogCount} duration={2} />}
+              label="Scholarships Tracked"
+              subtitle="Verified active in catalog"
               accentColor="text-white"
             />
           </TiltCard>
@@ -146,9 +146,9 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
               theme="dark"
               size="default"
               className="h-full"
-              value={<CounterNumber prefix="₹" value={1000} suffix=" Cr+" duration={2.2} />}
-              label="Scholarship Funds"
-              subtitle="Annual Value Tracked"
+              value="12 Hours"
+              label="Catalog Refresh"
+              subtitle="Automated verification cycle"
               accentColor="text-emerald-400"
             />
           </TiltCard>
@@ -158,9 +158,9 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
               theme="dark"
               size="default"
               className="h-full"
-              value={<span className="inline-flex items-baseline gap-1"><CounterNumber value={28} duration={1.8} /><span>States & UTs</span></span>}
-              label="State Quotas"
-              subtitle="Residence Schemes"
+              value="Pan-India"
+              label="Central & State Schemes"
+              subtitle="Government & trust grants"
               accentColor="text-cyan-400"
             />
           </TiltCard>
@@ -170,9 +170,9 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
               theme="dark"
               size="default"
               className="h-full"
-              value="100% Free"
-              label="For Indian Students"
-              subtitle="Zero Application Fees"
+              value="Official Sources"
+              label="Application Links"
+              subtitle="Direct portal redirects"
               accentColor="text-indigo-300"
             />
           </TiltCard>

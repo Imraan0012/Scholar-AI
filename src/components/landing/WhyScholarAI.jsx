@@ -1,29 +1,29 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Target, BellRing, Sparkles, CheckCircle2, Clock } from 'lucide-react';
+import { ShieldCheck, Target, BellRing, Building2 } from 'lucide-react';
 import TiltCard from '../ui/TiltCard';
 
 export default function WhyScholarAI() {
   const points = [
     {
-      icon: Target,
-      title: "No False Promises",
-      desc: "We test your exact profile against every clause and eligibility criteria so you never spend hours on disqualified applications."
+      icon: ShieldCheck,
+      title: "Verified Schemes",
+      desc: "Every scholarship in our catalog is verified directly against official government and trust portals."
     },
     {
-      icon: ShieldCheck,
-      title: "100% Verified Authentic Schemes",
-      desc: "Every scholarship is cross-referenced with government gazettes, institutional registries, and verified trust databases."
+      icon: Target,
+      title: "Accurate Eligibility Matching",
+      desc: "We check your specific academic, income, category and state criteria so you only see scholarships you qualify for."
     },
     {
       icon: BellRing,
-      title: "Real-Time Deadline Alerts",
-      desc: "Never miss crucial portal openings, verification rounds, or submission windows with personalized timeline alerts."
+      title: "Verified Deadlines & Timelines",
+      desc: "Track active application windows, upcoming cycles, and official closing dates without missing deadlines."
     },
     {
-      icon: Sparkles,
-      title: "Tailored for Indian Education",
-      desc: "Full support for all State Boards, CBSE, ICSE, State Quotas, Caste/Income categories, and central university schemes."
+      icon: Building2,
+      title: "Pan-India Coverage",
+      desc: "Central Government NSP programs, State Department portals, and premier Corporate Trust grants in one place."
     }
   ];
 
@@ -36,20 +36,17 @@ export default function WhyScholarAI() {
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className="py-14 sm:py-16 px-4 max-w-5xl mx-auto relative z-10"
     >
-      <div className="glass-panel rounded-2xl p-6 sm:p-9 lg:p-10 border border-white/10 relative overflow-hidden bg-gradient-to-b from-[#10131f]/90 to-[#0c0d14]/95 shadow-2xl backdrop-blur-2xl">
+      <div className="glass-panel rounded-3xl p-6 sm:p-9 lg:p-10 border border-white/10 relative overflow-hidden bg-gradient-to-b from-[#10131f]/90 to-[#0c0d14]/95 shadow-2xl backdrop-blur-2xl">
         <div className="max-w-2xl mb-8">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-            Why Scholar AI
-          </span>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight mt-3">
-            Designed to End Scholarship Confusion
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+            Built to end scholarship confusion
           </h2>
           <p className="text-gray-300 mt-3 text-xs sm:text-sm leading-relaxed">
-            Over ₹1,000 Crores in Indian scholarships go unclaimed each year simply because students don't know they qualify. Scholar AI bridges this exact gap.
+            Thousands of Indian students miss out on scholarships simply because they don't know they qualify or where to apply. Scholar AI solves this by matching your profile with verified opportunities.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
           {points.map((pt, idx) => {
             const Icon = pt.icon;
             return (
@@ -58,7 +55,7 @@ export default function WhyScholarAI() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: idx * 0.12 }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
               >
                 <TiltCard
                   maxTilt={6}
@@ -69,10 +66,10 @@ export default function WhyScholarAI() {
                     <Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-white mb-1">
+                    <h3 className="text-base font-bold text-white mb-1">
                       {pt.title}
                     </h3>
-                    <p className="text-gray-400 text-sm leading-relaxed">
+                    <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">
                       {pt.desc}
                     </p>
                   </div>

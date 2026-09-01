@@ -408,9 +408,9 @@ function MainAppContent() {
                 onCheckEligibilityClick={handleStartCheckEligibility}
                 onAuthClick={(mode) => handleOpenAuth(mode)}
               />
-              <BuiltForIndiaSection onCheckEligibilityClick={handleStartCheckEligibility} />
-              <HowItWorksSection onCheckEligibilityClick={handleStartCheckEligibility} />
               <ScholarshipTypes onCheckEligibilityClick={handleStartCheckEligibility} />
+              <HowItWorksSection onCheckEligibilityClick={handleStartCheckEligibility} />
+              <BuiltForIndiaSection onCheckEligibilityClick={handleStartCheckEligibility} />
               <WhyScholarAI />
               <FinalCTASection onCheckEligibilityClick={handleStartCheckEligibility} />
               <Footer onAuthClick={(mode) => handleOpenAuth(mode)} />
