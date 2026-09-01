@@ -104,10 +104,11 @@ export function createEmptyProfile(user = null) {
   };
 }
 
-// Lightweight hint storage to prevent screen flash on reload
-function writeProfileHint(profileExists, onboardingCompleted) {
+// Lightweight hint storage to prevent screen flash on reload (strictly user-scoped)
+function writeProfileHint(userId, profileExists, onboardingCompleted) {
+  if (!userId) return;
   try {
-    localStorage.setItem('scholar_ai_profile_hint', JSON.stringify({
+    localStorage.setItem(`scholar_ai_profile_hint_${userId}`, JSON.stringify({
       profileExists,
       onboardingCompleted,
       cachedAt: Date.now()
@@ -115,9 +116,15 @@ function writeProfileHint(profileExists, onboardingCompleted) {
   } catch (e) { }
 }
 
-function clearProfileHint() {
+function clearProfileHint(userId = null) {
   try {
-    localStorage.removeItem('scholar_ai_profile_hint');
+    if (userId) {
+      localStorage.removeItem(`scholar_ai_profile_hint_${userId}`);
+    } else {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('scholar_ai_profile_hint')) localStorage.removeItem(k);
+      });
+    }
   } catch (e) { }
 }
 
@@ -172,7 +179,19 @@ export const StudentProfileProvider = ({ children }) => {
 
   const recalculateBackendEligibility = useCallback(async (targetUser, targetProfile) => {
     const user = targetUser || currentUser;
+    if (!user?.id) {
+      setEvaluationResults(null);
+      return null;
+    }
+
     const activeProfile = targetProfile || profileRef.current;
+    // Strictly require that the profile belongs to THIS authenticated user
+    if (activeProfile?.userId && activeProfile.userId !== user.id) {
+      console.warn(`[StudentProfileContext] Ownership mismatch: profile ${activeProfile.userId} vs user ${user.id}`);
+      setEvaluationResults(null);
+      return null;
+    }
+
     const isCompleted = activeProfile?.onboardingComplete === true || activeProfile?.isOnboarded === true;
 
     // First attempt: fetch deterministic evaluation from backend Spring Boot API
@@ -186,7 +205,7 @@ export const StudentProfileProvider = ({ children }) => {
       console.warn('[StudentProfileContext] Backend evaluation fetch notice:', err.message);
     }
 
-    // Fallback attempt: execute local evaluateAll ONLY if profile is completely loaded and valid
+    // Fallback attempt: execute local evaluateAll ONLY if profile is completely loaded and valid for THIS user
     if (isCompleted && Array.isArray(scholarships) && scholarships.length > 0) {
       const localEval = eligibilityService.evaluateAll(activeProfile, scholarships);
       setEvaluationResults(localEval);
@@ -198,7 +217,10 @@ export const StudentProfileProvider = ({ children }) => {
   // ── Profile + auxiliary data loader ─────────────────────────────────────────
   const loadUserData = useCallback(async (user, { isRetry = false, isBackground = false } = {}) => {
     if (!user?.id) {
-      setProfile(createEmptyProfile(null));
+      const empty = createEmptyProfile(null);
+      setProfile(empty);
+      profileRef.current = empty;
+      setEvaluationResults(null);
       setProfileStatus('unauthenticated');
       setProfileLoading(false);
       setProfileRefreshing(false);
@@ -231,18 +253,23 @@ export const StudentProfileProvider = ({ children }) => {
 
       const empty = createEmptyProfile(user);
 
-      if (userProfile && (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course || userProfile.onboardingComplete || userProfile.annualFamilyIncome != null)) {
+      // Verify the returned profile actually belongs to this user ID
+      const isValidProfileForThisUser = userProfile && (!userProfile.userId || userProfile.userId === user.id) &&
+        (userProfile.id || userProfile.fullName || userProfile.educationLevel || userProfile.course || userProfile.onboardingComplete || userProfile.annualFamilyIncome != null);
+
+      if (isValidProfileForThisUser) {
         const firstIncomplete = profileService.getFirstIncompleteStep(userProfile);
         // Completion is determined SOLELY by explicit persisted completion flag
         const isCompleted = Boolean(userProfile.onboardingComplete === true || userProfile.isOnboarded === true || userProfile.onboarding_complete === true);
         const persistedStep = userProfile.onboardingStep || userProfile.onboarding_step;
         const step = isCompleted ? 5 : (persistedStep ? Math.min(5, Math.max(1, Number(persistedStep))) : Math.min(5, Math.max(1, firstIncomplete)));
 
-        console.log(`[PROFILE] profileExists=true onboardingCompleted=${isCompleted} onboardingStep=${step}`);
+        console.log(`[PROFILE] user=${user.id} profileExists=true onboardingCompleted=${isCompleted} onboardingStep=${step}`);
 
         const cleanProfile = {
           ...empty,
           ...userProfile,
+          userId: user.id,
           isOnboarded: isCompleted,
           onboardingComplete: isCompleted,
           onboardingStep: step
@@ -253,7 +280,7 @@ export const StudentProfileProvider = ({ children }) => {
         setProfileStatus('loaded');
         setProfileError(null);
 
-        writeProfileHint(true, isCompleted);
+        writeProfileHint(user.id, true, isCompleted);
         try {
           profileService.saveOnboardingProgress(step, cleanProfile, user.id);
         } catch (e) { }
@@ -265,16 +292,18 @@ export const StudentProfileProvider = ({ children }) => {
           });
         }
       } else {
-        console.log('[PROFILE] profileExists=false onboardingCompleted=false onboardingStep=1');
-        // If we already have a loaded, completed profile in memory, do NOT downgrade to not_found on empty background sync
-        if (profileRef.current?.id && (profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded)) {
-          console.log('[StudentProfileContext] Retaining existing in-memory completed profile despite empty background response');
+        console.log(`[PROFILE] user=${user.id} profileExists=false onboardingCompleted=false onboardingStep=1`);
+        // NEVER retain another user's profile in memory! Only retain if it belongs to THIS EXACT user ID
+        if (profileRef.current?.userId === user.id && (profileRef.current?.onboardingComplete || profileRef.current?.isOnboarded)) {
+          console.log('[StudentProfileContext] Retaining existing in-memory completed profile for same user');
           setProfileStatus('loaded');
         } else {
           setProfile(empty);
+          profileRef.current = empty;
+          setEvaluationResults(null);
           setProfileStatus('not_found');
           setProfileError(null);
-          writeProfileHint(false, false);
+          writeProfileHint(user.id, false, false);
         }
       }
 
@@ -283,24 +312,15 @@ export const StudentProfileProvider = ({ children }) => {
       setNotifications(Array.isArray(userNotifs) ? userNotifs : []);
     } catch (err) {
       console.warn('[StudentProfileContext] loadUserData notice:', err.message);
-
-      // If we already have a loaded profile in memory, NEVER change profileStatus to error or not_found!
-      if (profileRef.current?.id || profileRef.current?.onboardingComplete || profileRef.current?.course) {
-        setProfileStatus('loaded');
-      } else {
+      if (!isBackground) {
         setProfileStatus('error');
+        setProfileError('Could not load your profile from the server. Please check your connection and retry.');
       }
-
-      const isTimeout = err?.isTimeout === true || err?.status === 408;
-      const msg = isTimeout
-        ? 'Server is waking up — click Retry in a moment.'
-        : 'Could not connect to profile service. Click Retry.';
-      setProfileError(msg);
     } finally {
       setProfileLoading(false);
       setProfileRefreshing(false);
     }
-  }, []);
+  }, [loadScholarshipsAsync, recalculateBackendEligibility]);
 
   // ── Retry handler (callable from UI) ────────────────────────────────────────
   const retryProfile = useCallback(() => {
@@ -328,10 +348,14 @@ export const StudentProfileProvider = ({ children }) => {
 
       if (user) {
         setCurrentUser(user);
+        setProfile(createEmptyProfile(user));
+        profileRef.current = createEmptyProfile(user);
         setProfileStatus('loading');
       } else {
         setCurrentUser(null);
-        setProfile(createEmptyProfile(null));
+        const empty = createEmptyProfile(null);
+        setProfile(empty);
+        profileRef.current = empty;
         setProfileStatus('unauthenticated');
         setBookmarks([]);
         setSavedApplications([]);
@@ -362,19 +386,27 @@ export const StudentProfileProvider = ({ children }) => {
 
       if (event === 'SIGNED_IN' || (event === 'USER_UPDATED' && user)) {
         if (user) {
-          setCurrentUser(user);
-          // If we already have this user's profile loaded and marked complete in memory, perform silent background sync
-          const currentProfile = profileRef.current;
-          if (currentProfile?.userId === user.id && (currentProfile?.onboardingComplete || currentProfile?.isOnboarded)) {
-            loadUserData(user, { isBackground: true });
-          } else {
-            setProfileStatus('loading');
-            loadUserData(user);
+          const previousUserId = profileRef.current?.userId || currentUser?.id;
+          if (previousUserId && previousUserId !== user.id) {
+            console.log(`[StudentProfileContext] User changed from ${previousUserId} to ${user.id}. Clearing previous user data.`);
+            const freshEmpty = createEmptyProfile(user);
+            setProfile(freshEmpty);
+            profileRef.current = freshEmpty;
+            setEvaluationResults(null);
+            setBookmarks([]);
+            setSavedApplications([]);
+            setNotifications([]);
           }
+          setCurrentUser(user);
+          setProfileStatus('loading');
+          loadUserData(user);
         }
       } else if (event === 'SIGNED_OUT' || !user) {
         setCurrentUser(null);
-        setProfile(createEmptyProfile(null));
+        const freshEmpty = createEmptyProfile(null);
+        setProfile(freshEmpty);
+        profileRef.current = freshEmpty;
+        setEvaluationResults(null);
         setProfileStatus('unauthenticated');
         setBookmarks([]);
         setSavedApplications([]);
@@ -388,9 +420,9 @@ export const StudentProfileProvider = ({ children }) => {
 
     return () => {
       mounted = false;
-      unsubscribeAuth();
+      if (typeof unsubscribeAuth === 'function') unsubscribeAuth();
     };
-  }, [loadUserData, loadScholarshipsAsync]);
+  }, [loadUserData, loadScholarshipsAsync, currentUser?.id]);
 
   // ── Real-time scholarship & sources subscription ───────────────────────────
   useEffect(() => {
