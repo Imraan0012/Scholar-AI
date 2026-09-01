@@ -1509,143 +1509,152 @@ export default function StudentDashboard({ onOpenOnboarding, onOpenAdmin, onLogo
                 </div>
               </div>
 
-              {/* Digital Document Vault & Marksheet Uploads */}
+              {/* Application Document Checklist (Preparation & Readiness) */}
               <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-[#2563EB]" />
-                      <span>Digital Document Vault & Marksheets</span>
+                      <CheckCircle className="w-5 h-5 text-[#2563EB]" />
+                      <span>Application Document Checklist</span>
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Upload and manage supporting documents required for official government and corporate scholarship applications.
+                    <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                      These are documents you may need when applying for scholarships on official portals. Scholar AI does not require you to upload them here.
                     </p>
                   </div>
-                  <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
-                    {Object.keys(profile.uploadedFiles || {}).length} of 9 Documents Verified
+                  <div className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 self-start flex-shrink-0">
+                    Upload documents only on official portals
                   </div>
                 </div>
 
-                {/* Document List Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Document Readiness Checklist Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                   {[
-                    { id: 'doc_aadhaar', name: 'Aadhaar / Identity Proof', desc: 'Required for DBT direct bank transfer verification' },
-                    { id: 'doc_bank_passbook', name: 'Bank Account Passbook / Statement', desc: 'Active bank account linked to Aadhaar' },
-                    { id: 'doc_class10', name: 'Class 10 Board Marksheet', desc: 'Date of birth and secondary education proof' },
-                    { id: 'doc_class12', name: 'Class 12 Board Marksheet', desc: 'Higher secondary academic eligibility verification' },
-                    { id: 'doc_bonafide', name: 'College Bonafide / Enrollment Certificate', desc: 'Proof of active admission in current degree' },
-                    { id: 'doc_income_cert', name: 'Annual Income Certificate', desc: 'Issued by Tehsildar / Sub-Divisional Magistrate' },
-                    { id: 'doc_category_cert', name: 'Caste / Category Certificate (OBC/SC/ST/EWS)', desc: 'Official government reservation certificate' },
-                    { id: 'doc_domicile', name: 'State Residence / Domicile Certificate', desc: 'Required for state-specific quota scholarships' },
-                    { id: 'doc_special_proof', name: 'Disability / Minority / Special Proof', desc: 'Applicable for special category quota schemes' }
+                    {
+                      id: 'doc_aadhaar',
+                      name: 'Aadhaar / Identity Proof',
+                      desc: 'Identity verification for official applications',
+                      defaultStatus: 'READY'
+                    },
+                    {
+                      id: 'doc_bank_passbook',
+                      name: 'Bank Account Details / Passbook',
+                      desc: 'May be required for DBT scholarship payments',
+                      defaultStatus: 'READY'
+                    },
+                    {
+                      id: 'doc_class10',
+                      name: 'Class 10 Marksheet',
+                      desc: 'Academic and date-of-birth proof where required',
+                      defaultStatus: 'READY'
+                    },
+                    {
+                      id: 'doc_class12',
+                      name: 'Class 12 Marksheet',
+                      desc: 'Higher-secondary academic proof where applicable',
+                      defaultStatus: profile.class12Percentage ? 'READY' : 'NOT_APPLICABLE'
+                    },
+                    {
+                      id: 'doc_bonafide',
+                      name: 'College Bonafide / Enrollment Certificate',
+                      desc: 'Proof of current admission/enrollment',
+                      defaultStatus: 'READY'
+                    },
+                    {
+                      id: 'doc_income_cert',
+                      name: 'Income Certificate',
+                      desc: 'Required for income-based scholarship schemes',
+                      defaultStatus: profile.hasIncomeCertificate ? 'READY' : (profile.annualFamilyIncome ? 'NOT_SURE' : 'NOT_APPLICABLE')
+                    },
+                    {
+                      id: 'doc_category_cert',
+                      name: 'Category Certificate',
+                      desc: 'Required only for applicable SC/ST/OBC/EWS schemes',
+                      defaultStatus: (profile.category === 'GENERAL' || profile.socialCategory === 'GENERAL') ? 'NOT_APPLICABLE' : (profile.hasCategoryCertificate ? 'READY' : 'NOT_SURE')
+                    },
+                    {
+                      id: 'doc_domicile',
+                      name: 'State Residence / Domicile Certificate',
+                      desc: 'May be required for state-specific scholarship schemes',
+                      defaultStatus: profile.hasDomicileCertificate ? 'READY' : (profile.domicileState ? 'NOT_SURE' : 'NOT_APPLICABLE')
+                    },
+                    {
+                      id: 'doc_special_proof',
+                      name: 'Disability / Minority / Special Category Proof',
+                      desc: 'Required only when the scholarship has that specific eligibility condition',
+                      defaultStatus: (profile.hasDisability || profile.isMinority || profile.isOrphan || profile.isSingleParent) ? 'NOT_SURE' : 'NOT_APPLICABLE'
+                    }
                   ].map((doc) => {
-                    const uploaded = (profile.uploadedFiles || {})[doc.id];
-                    const isReady = Boolean(uploaded);
+                    const currentStatus = (profile.documentStatuses || {})[doc.id] || doc.defaultStatus;
+
+                    const statusConfig = {
+                      READY: {
+                        label: 'Ready',
+                        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      },
+                      NOT_READY: {
+                        label: 'Not Ready',
+                        badgeClass: 'bg-amber-50 text-amber-800 border-amber-200'
+                      },
+                      NOT_SURE: {
+                        label: 'Not Sure',
+                        badgeClass: 'bg-sky-50 text-sky-800 border-sky-200'
+                      },
+                      NOT_APPLICABLE: {
+                        label: 'Not Applicable',
+                        badgeClass: 'bg-slate-100 text-slate-500 border-slate-200'
+                      }
+                    };
+
+                    const currentConfig = statusConfig[currentStatus] || statusConfig.NOT_SURE;
 
                     return (
                       <div
                         key={doc.id}
-                        className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
-                          isReady
-                            ? 'bg-emerald-50/40 border-emerald-200/90'
-                            : 'bg-slate-50 border-slate-200'
-                        }`}
+                        className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-colors flex flex-col justify-between gap-3"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <span className="text-xs font-bold text-slate-900 block truncate">
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-900 block leading-snug">
                               {doc.name}
                             </span>
-                            <span className="text-[11px] text-slate-500 block mt-0.5 leading-tight line-clamp-1">
-                              {doc.desc}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex-shrink-0 ${currentConfig.badgeClass}`}>
+                              {currentConfig.label}
                             </span>
-                            {isReady && uploaded && (
-                              <span className="text-[11px] font-bold text-emerald-700 block mt-1 truncate">
-                                ✓ {uploaded.name} • {uploaded.size}
-                              </span>
-                            )}
                           </div>
-
-                          <span
-                            className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md border flex-shrink-0 ${
-                              isReady
-                                ? 'bg-emerald-100/70 text-emerald-800 border-emerald-300'
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}
-                          >
-                            {isReady ? 'Ready' : 'Pending'}
+                          <span className="text-[11px] text-slate-500 block mt-1 leading-relaxed">
+                            {doc.desc}
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100/80">
-                          <input
-                            type="file"
-                            id={`profile_vault_${doc.id}`}
-                            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                            className="hidden"
+                        <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2 text-xs">
+                          <span className="text-[11px] text-slate-400 font-medium">Readiness:</span>
+                          <select
+                            value={currentStatus}
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const currentFiles = { ...(profile.uploadedFiles || {}) };
-                                currentFiles[doc.id] = {
-                                  name: file.name,
-                                  size: `${(file.size / 1024).toFixed(1)} KB`,
-                                  type: file.type,
-                                  date: new Date().toLocaleDateString()
-                                };
-                                const currentStatuses = { ...(profile.documentStatuses || {}) };
-                                currentStatuses[doc.id] = 'READY';
-
-                                updateProfile({
-                                  uploadedFiles: currentFiles,
-                                  documentStatuses: currentStatuses
-                                });
-                                showToast(`Uploaded ${file.name} for ${doc.name}`);
-                              }
+                              const newStatus = e.target.value;
+                              const updatedStatuses = { ...(profile.documentStatuses || {}), [doc.id]: newStatus };
+                              updateProfile({ documentStatuses: updatedStatuses });
+                              showToast(`Updated ${doc.name} readiness to ${statusConfig[newStatus]?.label || newStatus}`);
                             }}
-                          />
-
-                          {isReady ? (
-                            <div className="flex items-center gap-2">
-                              <label
-                                htmlFor={`profile_vault_${doc.id}`}
-                                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
-                              >
-                                Replace
-                              </label>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const currentFiles = { ...(profile.uploadedFiles || {}) };
-                                  delete currentFiles[doc.id];
-                                  const currentStatuses = { ...(profile.documentStatuses || {}) };
-                                  currentStatuses[doc.id] = 'PENDING';
-
-                                  updateProfile({
-                                    uploadedFiles: currentFiles,
-                                    documentStatuses: currentStatuses
-                                  });
-                                  showToast(`Removed document for ${doc.name}`);
-                                }}
-                                className="p-1 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                title="Delete document"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <label
-                              htmlFor={`profile_vault_${doc.id}`}
-                              className="px-3 py-1 rounded-lg text-xs font-bold bg-[#2563EB] hover:bg-blue-700 text-white transition-all shadow-2xs inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
-                            >
-                              <Upload className="w-3 h-3" />
-                              <span>Upload Document</span>
-                            </label>
-                          )}
+                            className="text-[11px] font-bold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="READY">Ready</option>
+                            <option value="NOT_READY">Not Ready</option>
+                            <option value="NOT_SURE">Not Sure</option>
+                            <option value="NOT_APPLICABLE">Not Applicable</option>
+                          </select>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Trust & Security Notice */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5 text-xs text-slate-600">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>
+                    <strong>Privacy Notice:</strong> Scholar AI does not require you to upload Aadhaar, bank statements, or other sensitive documents. Submit them only through the official scholarship portal when required.
+                  </span>
                 </div>
               </div>
             </div>
