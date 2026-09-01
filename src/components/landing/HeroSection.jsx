@@ -129,10 +129,10 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
           </a>
         </motion.div>
 
-        {/* 4 Stat Cards Grid (Uniform 165-175px height, equal width, identical border styling) */}
+        {/* 4 Stat Cards Grid (Sleek, compact, balanced dimensions) */}
         <motion.div
           variants={itemVariants}
-          className="mt-8 sm:mt-9 grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 max-w-4xl w-full"
+          className="mt-7 sm:mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-3.5 max-w-3xl w-full"
         >
           {/* Card 1 */}
           <TiltCard maxTilt={6} className="h-full">
