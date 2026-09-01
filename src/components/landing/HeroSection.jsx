@@ -195,7 +195,7 @@ export default function HeroSection({ currentUser, onCheckEligibilityClick, onAu
         {/* Centered Official Source / Trust Row */}
         <motion.div
           variants={itemVariants}
-          className="mt-6 flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-[13px] text-gray-400 font-medium"
+          className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-[13px] text-gray-400 font-medium"
         >
           <div className="flex items-center gap-2">
             <Landmark className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
